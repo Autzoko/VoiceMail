@@ -1,0 +1,2 @@
+model,dataset,condition,split,metric,error_rate,sub_rate,del_rate,ins_rate,n_ref_tokens,n_utts,n_empty_hyp,hours,rtf,lang_acc,normalizer,segmentation,decoding,git_commit,date
+Qwen3-ASR-0.6B,notsofar,sdm,eval (240825.1 full),WER,31.94,16.0,10.56,5.38,1188480,158028,2340,108.2,0.0116,84.89,chime8 whisper-en,oracle,transformers bf16 greedy max_new_tokens=1024 lang=auto,7da82d0,2026-11-16

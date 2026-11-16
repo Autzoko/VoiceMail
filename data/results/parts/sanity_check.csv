@@ -1,0 +1,2 @@
+model,dataset,condition,split,metric,error_rate,sub_rate,del_rate,ins_rate,n_ref_tokens,n_utts,n_empty_hyp,hours,rtf,lang_acc,normalizer,segmentation,decoding,git_commit,date
+Qwen3-ASR-1.7B,librispeech,clean,"test-clean (sanity check; official 1.7B=1.63, 0.6B=2.11)",WER,1.65,1.23,0.29,0.13,53116,2620,0,5.4,0.0076,100.0,chime8 whisper-en,oracle,transformers bf16 greedy max_new_tokens=1024 lang=auto,8ef6da2,2026-11-16

@@ -1,0 +1,11 @@
+model,dataset,condition,split,metric,error_rate,sub_rate,del_rate,ins_rate,n_ref_tokens,n_utts,n_empty_hyp,hours,rtf,lang_acc,normalizer,segmentation,decoding,git_commit,date
+Qwen3-ASR-0.6B,librispeech,clean,"test-clean (sanity check; official 1.7B=1.63, 0.6B=2.11)",WER,2.13,1.65,0.3,0.17,53116,2620,0,5.4,0.0054,99.96,chime8 whisper-en,oracle,transformers bf16 greedy max_new_tokens=1024 lang=auto,7da82d0,2026-11-16
+Qwen3-ASR-0.6B,ami,ihm,test (full-corpus-asr),WER,14.49,7.11,5.93,1.45,89874,10582,366,8.53,0.0111,79.23,chime8 whisper-en,oracle,transformers bf16 greedy max_new_tokens=1024 lang=auto,7da82d0,2026-11-16
+Qwen3-ASR-0.6B,ami,sdm,test (full-corpus-asr),WER,31.52,14.69,11.87,4.96,89874,10582,775,8.53,0.011,64.45,chime8 whisper-en,oracle,transformers bf16 greedy max_new_tokens=1024 lang=auto,7da82d0,2026-11-16
+Qwen3-ASR-0.6B,alimeeting,near,Test,CER,7.07,4.09,2.0,0.98,209813,16358,219,12.46,0.0085,98.03,zh: t2s+NFKC+no-punct (char),oracle,transformers bf16 greedy max_new_tokens=1024 lang=auto,7da82d0,2026-11-16
+Qwen3-ASR-0.6B,alimeeting,far,Test,CER,26.7,14.84,6.93,4.93,209813,16358,727,12.46,0.0181,93.91,zh: t2s+NFKC+no-punct (char),oracle,transformers bf16 greedy max_new_tokens=1024 lang=auto,7da82d0,2026-11-16
+Qwen3-ASR-0.6B,notsofar,ihm,eval (240825.1 full),WER,6.41,3.24,1.74,1.43,187980,25189,45,17.13,0.0101,93.16,chime8 whisper-en,oracle,transformers bf16 greedy max_new_tokens=1024 lang=auto,7da82d0,2026-11-16
+Qwen3-ASR-0.6B,chime6,ihm,"eval (S01,S21)",WER,24.86,10.84,8.22,5.8,57295,9334,201,5.89,0.0161,85.82,chime8 whisper-en,oracle,transformers bf16 greedy max_new_tokens=1024 lang=auto,7da82d0,2026-11-16
+Qwen3-ASR-0.6B,chime6,sdm,"eval (S01,S21)",WER,46.03,19.14,19.1,7.79,57295,9334,746,5.89,0.015,75.65,chime8 whisper-en,oracle,transformers bf16 greedy max_new_tokens=1024 lang=auto,7da82d0,2026-11-16
+Qwen3-ASR-0.6B,dipco,ihm,"eval (S01,S03,S06,S07,S08)",WER,15.08,6.38,3.07,5.64,28828,2903,3,3.17,0.0107,89.67,chime8 whisper-en,oracle,transformers bf16 greedy max_new_tokens=1024 lang=auto,7da82d0,2026-11-16
+Qwen3-ASR-0.6B,dipco,sdm,"eval (S01,S03,S06,S07,S08)",WER,41.09,17.19,13.59,10.31,28828,2903,156,3.17,0.0103,72.75,chime8 whisper-en,oracle,transformers bf16 greedy max_new_tokens=1024 lang=auto,7da82d0,2026-11-16
