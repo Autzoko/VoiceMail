@@ -2,8 +2,9 @@
 
 For each manifest (data/datasets/manifests/<dataset>__<condition>.jsonl):
   1. cut every reference segment from the recording (given channel), 16 kHz mono
-  2. transcribe with Qwen3-ASR (vLLM backend, bf16, greedy, max_new_tokens=1024, no language hint —
-     the official Qwen3-ASR evaluation protocol)
+  2. transcribe with Qwen3-ASR: bf16, greedy, max_new_tokens=1024, no language hint (official Qwen3-ASR
+     protocol). Official numbers use the vLLM backend; JUBAIL (CentOS 8, glibc 2.28) cannot install vLLM
+     wheels (need glibc>=2.31), so the default here is the official transformers backend (same model/decoding).
   3. normalize ref & hyp identically (src/utils/text_norm.py), score corpus-level WER (en) / CER (zh)
   4. write per-utterance outputs to data/outputs/<model>/<dataset>__<condition>.jsonl and append a
      summary row to data/results/<csv>
@@ -35,7 +36,7 @@ CSV_FIELDS = [
     "decoding", "git_commit", "date",
 ]
 
-SPLIT = {"ami": "test (full-corpus-asr)", "alimeeting": "Test", "notsofar": "eval (240825.1 full)",
+SPLIT = {"librispeech": "test-clean (sanity check; official 1.7B=1.63, 0.6B=2.11)", "ami": "test (full-corpus-asr)", "alimeeting": "Test", "notsofar": "eval (240825.1 full)",
          "chime6": "eval (S01,S21)", "dipco": "eval (S01,S03,S06,S07,S08)"}
 
 
@@ -51,7 +52,8 @@ def main():
     ap.add_argument("--model", default="Qwen/Qwen3-ASR-1.7B")
     ap.add_argument("--manifests", nargs="+", required=True, help="names under data/datasets/manifests")
     ap.add_argument("--csv", default="qwen3asr_baseline.csv")
-    ap.add_argument("--batch", type=int, default=256, help="segments per transcribe() call")
+    ap.add_argument("--backend", choices=["transformers", "vllm"], default="transformers")
+    ap.add_argument("--batch", type=int, default=64, help="segments per transcribe() call")
     ap.add_argument("--gpu-mem", type=float, default=0.85)
     ap.add_argument("--max-new-tokens", type=int, default=1024)
     ap.add_argument("--limit", type=int, default=0, help="debug: first N segments only")
@@ -63,8 +65,15 @@ def main():
     model_tag = args.model.rstrip("/").split("/")[-1]
     out_dir = ROOT / "data" / "outputs" / model_tag
     out_dir.mkdir(parents=True, exist_ok=True)
-    asr = Qwen3ASRModel.LLM(model=args.model, gpu_memory_utilization=args.gpu_mem, dtype="bfloat16",
-                            max_inference_batch_size=args.batch, max_new_tokens=args.max_new_tokens)
+    if args.backend == "vllm":
+        asr = Qwen3ASRModel.LLM(model=args.model, gpu_memory_utilization=args.gpu_mem, dtype="bfloat16",
+                                max_inference_batch_size=args.batch, max_new_tokens=args.max_new_tokens)
+    else:
+        import torch
+
+        asr = Qwen3ASRModel.from_pretrained(args.model, dtype=torch.bfloat16, device_map="cuda:0",
+                                            attn_implementation="sdpa", max_inference_batch_size=args.batch,
+                                            max_new_tokens=args.max_new_tokens)
     commit = git_commit()
 
     for name in args.manifests:
@@ -78,7 +87,8 @@ def main():
         done = {}
         if out_path.exists() and not args.overwrite:
             done = {r["id"]: r for r in map(json.loads, open(out_path))}
-        todo = [r for r in rows if r["id"] not in done]
+        # longest first: similar lengths share a batch (less padding) and OOM surfaces immediately
+        todo = sorted((r for r in rows if r["id"] not in done), key=lambda r: r["start"] - r["end"])
         print(f"[{name}] {len(rows)} segments, {len(todo)} to decode", flush=True)
 
         t0, audio_sec = time.time(), 0.0
@@ -118,7 +128,7 @@ def main():
                "hours": round(hours, 2), "rtf": round(rtf, 4) if todo else "",
                "lang_acc": round(100 * n_lang_ok / max(n_scored, 1), 2),
                "normalizer": "zh: t2s+NFKC+no-punct (char)" if lang == "zh" else "chime8 whisper-en",
-               "segmentation": "oracle", "decoding": f"vLLM bf16 greedy max_new_tokens={args.max_new_tokens} lang=auto",
+               "segmentation": "oracle", "decoding": f"{args.backend} bf16 greedy max_new_tokens={args.max_new_tokens} lang=auto",
                "git_commit": commit, "date": dt.date.today().isoformat()}
         print(json.dumps(row), flush=True)
         csv_path = ROOT / "data" / "results" / args.csv

@@ -53,6 +53,11 @@ snapshot_download("microsoft/NOTSOFAR", repo_type="dataset", local_dir=".", max_
                   allow_patterns=[f"{p}/*.json", f"{p}/close_talk/*.wav", f"{p}/sc_*/ch0.wav"])
 EOF
   ;;
+librispeech)
+  # Sanity check only: LibriSpeech test-clean (OpenSLR 12), to reproduce Qwen3-ASR's published WER.
+  pget https://openslr.trmal.net/resources/12/test-clean.tar.gz test-clean.tar.gz
+  untar test-clean.tar.gz .
+  ;;
 *) echo "unknown dataset $DS"; exit 1 ;;
 esac
 touch "$OUT/.done_download"

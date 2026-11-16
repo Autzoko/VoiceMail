@@ -30,6 +30,8 @@ MODEL=Qwen3-ASR-1.7B sbatch scripts/eval/eval.sbatch   # -> data/results/qwen3as
 ## Baseline evaluation protocol (v1)
 Oracle-segmented utterance-level ASR on the official test/eval split of AMI, AliMeeting, NOTSOFAR-1, CHiME-6
 and DiPCo, near-field (headset/close-talk) and single-distant-mic conditions. Decoding follows the official
-Qwen3-ASR protocol (vLLM, bf16, greedy, max_new_tokens=1024, automatic language). English is scored with the
+Qwen3-ASR protocol (bf16, greedy, max_new_tokens=1024, automatic language) but with the transformers backend:
+vLLM wheels need glibc>=2.31 and JUBAIL has 2.28. LibriSpeech test-clean is run first as a sanity check against
+the published WER. English is scored with the
 CHiME-8 Whisper-style normalizer (WER); Mandarin with punctuation-free character error rate (CER).
 Details: docstrings of `scripts/data/prepare_manifests.py` and `src/utils/text_norm.py`.

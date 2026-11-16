@@ -17,7 +17,7 @@ cd /scratch/ll5582/VoiceMail
 . env/activate.sh
 export HF_HUB_OFFLINE=1
 M=${MODEL:-Qwen3-ASR-1.7B}
-ALL="ami__ihm ami__sdm alimeeting__near alimeeting__far notsofar__ihm notsofar__sdm chime6__ihm chime6__sdm dipco__ihm dipco__sdm"
+ALL="librispeech__clean ami__ihm ami__sdm alimeeting__near alimeeting__far notsofar__ihm notsofar__sdm chime6__ihm chime6__sdm dipco__ihm dipco__sdm"
 echo "host=$(hostname) gpu=$(nvidia-smi --query-gpu=name --format=csv,noheader) commit=$(git rev-parse --short HEAD) model=$M start=$(date -Is)"
 python scripts/eval/run_asr.py --model data/checkpoints/$M --manifests ${MANIFESTS:-$ALL} ${EXTRA:-}
 echo "exit=$? end=$(date -Is)"

@@ -158,7 +158,21 @@ def check_audio(rows, tag):
     print(f"  {tag}: {len(info)} audio files OK ({over} segments slightly past end)", flush=True)
 
 
-PREP = {"ami": prep_ami, "alimeeting": prep_alimeeting, "notsofar": prep_notsofar,
+def prep_librispeech():
+    """Sanity-check set (not a meeting corpus): LibriSpeech test-clean, whole utterances."""
+    import soundfile as sf
+
+    rows = []
+    for tf in sorted((DS / "librispeech").glob("LibriSpeech/test-clean/*/*/*.trans.txt")):
+        for line in open(tf):
+            uid, text = line.strip().split(" ", 1)
+            wav = tf.parent / f"{uid}.flac"
+            rows.append(row(uid, uid.rsplit("-", 1)[0], uid.split("-")[0], wav, 0, 0.0,
+                            sf.info(str(wav)).duration, text))
+    return {"clean": rows}
+
+
+PREP = {"librispeech": prep_librispeech, "ami": prep_ami, "alimeeting": prep_alimeeting, "notsofar": prep_notsofar,
         "chime6": prep_chime6, "dipco": prep_dipco}
 
 
