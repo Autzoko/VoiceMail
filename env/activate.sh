@@ -8,3 +8,5 @@ export HF_HOME=/scratch/ll5582/.cache/huggingface
 [ -f /scratch/ll5582/HF_TOKEN ] && export HF_TOKEN=$(cat /scratch/ll5582/HF_TOKEN)
 export PYTHONPATH=$_VM_ROOT:$_VM_ROOT/src/models:${PYTHONPATH:-}
 export TOKENIZERS_PARALLELISM=false VLLM_WORKER_MULTIPROC_METHOD=spawn
+# login nodes cap processes+threads at 128 per user; keep BLAS/OMP pools small (override in jobs if needed)
+export OPENBLAS_NUM_THREADS=${OPENBLAS_NUM_THREADS:-4} OMP_NUM_THREADS=${OMP_NUM_THREADS:-4} MKL_NUM_THREADS=${MKL_NUM_THREADS:-4}
