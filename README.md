@@ -24,8 +24,14 @@ for d in ami alimeeting chime6 dipco notsofar; do # test splits only; remote ser
   nohup bash scripts/data/download.sh $d > logs/dl-$d.log 2>&1 &
 done
 python scripts/data/prepare_manifests.py         # -> data/datasets/manifests/<ds>__<cond>.jsonl
-MODEL=Qwen3-ASR-1.7B sbatch scripts/eval/eval.sbatch   # -> data/results/qwen3asr_baseline.csv
+MODEL=Qwen3-ASR-1.7B sbatch -p nvidia scripts/eval/eval.sbatch   # per-job CSV -> data/results/parts/
+EXTRA="--language-mode forced --csv X.csv" ...  # optional: give the dataset language to the model
+python scripts/eval/merge_results.py            # -> data/results/qwen3asr_baseline.csv
 ```
+
+Results sync (JUBAIL has no GitHub credentials): on the laptop
+`rsync -a JUBAIL:/scratch/ll5582/VoiceMail/data/results/ data/results/`, commit + push; then on JUBAIL
+`git checkout -- data/results && git pull`.
 
 ## Baseline evaluation protocol (v1)
 Oracle-segmented utterance-level ASR on the official test/eval split of AMI, AliMeeting, NOTSOFAR-1, CHiME-6
