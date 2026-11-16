@@ -14,5 +14,5 @@ export CC=gcc CXX=g++ MAX_JOBS=16
 [ -x env/venv/bin/python ] || uv venv -q --python 3.12 env/venv
 uv pip install qwen-asr lhotse meeteval jiwer soundfile pandas zhconv click textgrid huggingface_hub
 uv pip install --no-deps -e lib/chime-utils
-python -c "import qwen_asr, torch, lhotse, meeteval, chime_utils; print('qwen_asr from', qwen_asr.__file__); print("torch", torch.__version__, 'cuda', torch.version.cuda)"
+python -c "import qwen_asr, torch, lhotse, meeteval, chime_utils; print('qwen_asr from', qwen_asr.__file__); print('torch', torch.__version__, 'cuda', torch.version.cuda)"
 uv pip freeze > env/requirements.lock.txt
