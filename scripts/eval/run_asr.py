@@ -51,7 +51,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="Qwen/Qwen3-ASR-1.7B")
     ap.add_argument("--manifests", nargs="+", required=True, help="names under data/datasets/manifests")
-    ap.add_argument("--csv", default="qwen3asr_baseline.csv")
+    ap.add_argument("--csv", default="qwen3asr_baseline.csv", help="file name under data/results/parts/ (merge with merge_results.py)")
     ap.add_argument("--backend", choices=["transformers", "vllm"], default="transformers")
     ap.add_argument("--batch", type=int, default=64, help="segments per transcribe() call")
     ap.add_argument("--gpu-mem", type=float, default=0.85)
@@ -131,7 +131,8 @@ def main():
                "segmentation": "oracle", "decoding": f"{args.backend} bf16 greedy max_new_tokens={args.max_new_tokens} lang=auto",
                "git_commit": commit, "date": dt.date.today().isoformat()}
         print(json.dumps(row), flush=True)
-        csv_path = ROOT / "data" / "results" / args.csv
+        csv_path = ROOT / "data" / "results" / "parts" / args.csv
+        csv_path.parent.mkdir(parents=True, exist_ok=True)
         new = not csv_path.exists()
         with open(csv_path, "a", newline="") as f:
             w = csv.DictWriter(f, fieldnames=CSV_FIELDS)
