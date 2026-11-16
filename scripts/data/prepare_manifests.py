@@ -68,6 +68,8 @@ def prep_ami():
     # empty sets; skip the fix for empty parts (the test part still goes through the normal QA path).
     _fix = ami_recipe.fix_manifests
     ami_recipe.fix_manifests = lambda r, s: (r, s) if len(r) == 0 else _fix(r, s)
+    _val = ami_recipe.validate_recordings_and_supervisions
+    ami_recipe.validate_recordings_and_supervisions = lambda r, s, **kw: None if len(r) == 0 else _val(r, s, **kw)
     prepare_ami = ami_recipe.prepare_ami
 
     root = DS / "ami"
