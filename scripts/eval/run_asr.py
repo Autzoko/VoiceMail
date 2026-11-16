@@ -63,7 +63,7 @@ def main():
     model_tag = args.model.rstrip("/").split("/")[-1]
     out_dir = ROOT / "data" / "outputs" / model_tag
     out_dir.mkdir(parents=True, exist_ok=True)
-    asr = Qwen3ASRModel.LLM(model=args.model, gpu_memory_utilization=args.gpu_mem,
+    asr = Qwen3ASRModel.LLM(model=args.model, gpu_memory_utilization=args.gpu_mem, dtype="bfloat16",
                             max_inference_batch_size=args.batch, max_new_tokens=args.max_new_tokens)
     commit = git_commit()
 

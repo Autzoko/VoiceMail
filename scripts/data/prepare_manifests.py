@@ -16,7 +16,6 @@ Conditions (oracle reference segmentation everywhere):
     python scripts/data/prepare_manifests.py [--datasets ami alimeeting notsofar chime6 dipco]
 """
 import argparse
-import glob
 import json
 import os
 import sys
@@ -68,7 +67,7 @@ def prep_ami():
     root = DS / "ami"
     out = {}
     for mic in ["ihm", "sdm"]:
-        m = prepare_ami(root / "wav_db", annotations=root / "ami_public_manual_1.6.2.zip", output_dir=None,
+        m = prepare_ami(root / "wav_db", annotations_dir=root / "ami_public_manual_1.6.2.zip", output_dir=None,
                         mic=mic, partition="full-corpus-asr", normalize_text="none")
         m = m["test"]
         out[mic] = from_lhotse(m["recordings"], m["supervisions"], "en")
@@ -108,8 +107,9 @@ def prep_notsofar():
 # --------------------------------------------------------------------------------------------- CHiME-6
 def prep_chime6():
     root = DS / "chime6"
-    tdir = next(p for p in [root / "transcriptions" / "eval", root / "CHiME6" / "transcriptions" / "eval"] if p.exists())
-    adir = next(p for p in [root / "audio" / "eval", root / "CHiME6" / "audio" / "eval"] if p.exists())
+    # layout after untar: CHiME6_eval/CHiME6/audio/eval/*.wav, transcriptions/transcriptions/eval/S*.json
+    tdir = next(p for p in root.glob("**/transcriptions/eval") if any(p.glob("S*.json")))
+    adir = next(p for p in root.glob("**/audio/eval") if any(p.glob("*.wav")))
     ihm, sdm = [], []
     for jf in sorted(tdir.glob("S*.json")):
         for i, u in enumerate(json.load(open(jf))):
@@ -124,7 +124,7 @@ def prep_chime6():
 # ----------------------------------------------------------------------------------------------- DiPCo
 def prep_dipco():
     root = DS / "dipco"
-    base = Path(next(iter(glob.glob(str(root / "**" / "transcriptions"), recursive=True)))).parent
+    base = next(p for p in root.glob("**/transcriptions") if (p / "eval").is_dir()).parent
     ihm, sdm = [], []
     for jf in sorted((base / "transcriptions" / "eval").glob("S*.json")):
         for i, u in enumerate(json.load(open(jf))):
@@ -139,6 +139,25 @@ def prep_dipco():
     return {"ihm": ihm, "sdm": sdm}
 
 
+def check_audio(rows, tag):
+    """Every referenced wav must exist, be 16 kHz, have the channel, and contain the segment."""
+    import soundfile as sf
+
+    info = {}
+    for a in sorted({r["audio"] for r in rows}):
+        assert os.path.exists(a), f"{tag}: missing {a}"
+        i = sf.info(a)
+        assert i.samplerate == 16000, f"{tag}: {a} sr={i.samplerate}"
+        info[a] = (i.channels, i.frames / i.samplerate)
+    over = 0
+    for r in rows:
+        ch, dur = info[r["audio"]]
+        assert r["channel"] < ch, f"{tag}: {r['id']} channel {r['channel']} >= {ch}"
+        over += r["end"] > dur + 0.01
+    assert over <= 0.001 * len(rows), f"{tag}: {over} segments end past the audio"
+    print(f"  {tag}: {len(info)} audio files OK ({over} segments slightly past end)", flush=True)
+
+
 PREP = {"ami": prep_ami, "alimeeting": prep_alimeeting, "notsofar": prep_notsofar,
         "chime6": prep_chime6, "dipco": prep_dipco}
 
@@ -151,8 +170,7 @@ def main():
         for cond, rows in PREP[ds]().items():
             n0 = len(rows)
             rows = [r for r in rows if keep(r)]
-            missing = sorted({r["audio"] for r in rows if not os.path.exists(r["audio"])})
-            assert not missing, f"{ds}/{cond}: {len(missing)} missing audio files, e.g. {missing[:3]}"
+            check_audio(rows, f"{ds}/{cond}")
             path = OUT / f"{ds}__{cond}.jsonl"
             write_manifest(rows, path)
             hrs = sum(r["end"] - r["start"] for r in rows) / 3600
