@@ -1,0 +1,71 @@
+# ---- AI-generated notes (kept local, not versioned) ----
+/_agent
+
+# ---- Data: datasets, checkpoints, outputs (only on JUBAIL) ----
+/data/datasets/*
+/data/checkpoints/*
+/data/outputs/*
+!/data/**/.gitkeep
+# results: keep small summary tables (csv/json/md), ignore bulky per-utterance dumps
+/data/results/**/hyp/
+/data/results/**/*.jsonl
+/data/results/**/*.ark
+/data/results/**/*.wav
+
+# ---- Third-party code (cloned on demand by scripts/setup) ----
+/lib/*
+!/lib/.gitkeep
+!/lib/README.md
+
+# ---- Environments ----
+/env/*
+!/env/.gitkeep
+!/env/*.txt
+!/env/*.yml
+!/env/*.yaml
+.venv/
+venv/
+.python-version
+
+# ---- Logs / job outputs ----
+/logs/
+*.log
+slurm-*.out
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# ---- Model / audio binaries ----
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.safetensors
+*.onnx
+*.flac
+*.wav
+*.mp3
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+
+# ---- Secrets ----
+.env
+HF_TOKEN
+*.token
+
+# ---- OS / editors ----
+.DS_Store
+.idea/
+.vscode/
+*.swp
