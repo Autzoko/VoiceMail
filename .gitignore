@@ -20,6 +20,7 @@
 # ---- Environments ----
 /env/*
 !/env/.gitkeep
+!/env/*.sh
 !/env/*.txt
 !/env/*.yml
 !/env/*.yaml
