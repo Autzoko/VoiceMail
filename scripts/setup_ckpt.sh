@@ -1,5 +1,5 @@
 #!/bin/bash
-# Download Qwen3-ASR checkpoints into data/checkpoints/ (run on a JUBAIL login node; compute nodes are slow).
+# Download Qwen3-ASR checkpoints into data/checkpoints/ (HF: ~10 MB/s from JUBAIL).
 set -e
 cd "$(dirname "$0")/.."
 . env/activate.sh

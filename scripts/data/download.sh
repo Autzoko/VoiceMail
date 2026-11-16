@@ -2,7 +2,8 @@
 # Download the official TEST/EVAL split of one meeting corpus into data/datasets/<name>/.
 #   bash scripts/data/download.sh {ami|alimeeting|chime6|dipco|notsofar}
 # Only evaluation data is fetched (no training sets). Archives are deleted after extraction.
-# NOTE: JUBAIL compute nodes have ~20 KB/s internet; run this on a LOGIN node:
+# NOTE: throughput is limited per *remote server* (OpenSLR, AMI mirror, Zenodo throttle each connection;
+# HF is fast), not by JUBAIL -- big archives therefore use parallel range requests (pget). Run anywhere, e.g.
 #   nohup bash scripts/data/download.sh <name> > logs/dl-<name>.log 2>&1 &
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)

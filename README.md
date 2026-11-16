@@ -20,7 +20,7 @@ bash scripts/setup_lib.sh                       # third-party repos -> lib/
 sbatch -p nvidia --gres=gpu:1 -c 16 --mem 64G -t 2:00:00 -o logs/setup_env-%j.out env/setup_env.sh
 . env/activate.sh
 bash scripts/setup_ckpt.sh                      # Qwen3-ASR-1.7B / 0.6B -> data/checkpoints (login node)
-for d in ami alimeeting chime6 dipco notsofar; do # test splits only; login node (compute nodes ~20 KB/s)
+for d in ami alimeeting chime6 dipco notsofar; do # test splits only; remote servers throttle per connection
   nohup bash scripts/data/download.sh $d > logs/dl-$d.log 2>&1 &
 done
 python scripts/data/prepare_manifests.py         # -> data/datasets/manifests/<ds>__<cond>.jsonl
