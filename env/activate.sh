@@ -6,5 +6,5 @@ export VIRTUAL_ENV=$_VM_ROOT/env/venv
 export UV_CACHE_DIR=/scratch/ll5582/cache/uv UV_PYTHON_INSTALL_DIR=/scratch/ll5582/cache/uv_python
 export HF_HOME=/scratch/ll5582/.cache/huggingface
 [ -f /scratch/ll5582/HF_TOKEN ] && export HF_TOKEN=$(cat /scratch/ll5582/HF_TOKEN)
-export PYTHONPATH=$_VM_ROOT:${PYTHONPATH:-}
+export PYTHONPATH=$_VM_ROOT:$_VM_ROOT/src/models:${PYTHONPATH:-}
 export TOKENIZERS_PARALLELISM=false VLLM_WORKER_MULTIPROC_METHOD=spawn
