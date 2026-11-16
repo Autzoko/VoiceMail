@@ -62,7 +62,13 @@ def from_lhotse(recordings, supervisions, lang, id_prefix=""):
 
 # ------------------------------------------------------------------------------------------------ AMI
 def prep_ami():
-    from lhotse.recipes.ami import prepare_ami
+    import lhotse.recipes.ami as ami_recipe
+
+    # only test audio is downloaded -> train/dev parts are empty and lhotse's fix_manifests asserts on
+    # empty sets; skip the fix for empty parts (the test part still goes through the normal QA path).
+    _fix = ami_recipe.fix_manifests
+    ami_recipe.fix_manifests = lambda r, s: (r, s) if len(r) == 0 else _fix(r, s)
+    prepare_ami = ami_recipe.prepare_ami
 
     root = DS / "ami"
     out = {}
