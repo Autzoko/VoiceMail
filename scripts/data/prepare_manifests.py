@@ -76,13 +76,31 @@ def prep_ami():
 
 # ------------------------------------------------------------------------------------------ AliMeeting
 def prep_alimeeting():
-    from lhotse.recipes.ali_meeting import prepare_ali_meeting
+    """Parse M2MeT Test TextGrids directly (lhotse's recipe requires the Train split to be present).
+    far : <room>_<meeting>.TextGrid, one tier per speaker  -> <room>_<meeting>_MS*.wav (8 ch), channel 0
+    near: <room>_<meeting>_N_SPKxxxx.TextGrid, single tier -> same-stem headset wav
+    """
+    import textgrid
 
-    out = {}
-    for cond, mic in [("near", "near"), ("far", "sdm")]:
-        m = prepare_ali_meeting(DS / "alimeeting", output_dir=None, mic=mic, normalize_text="none")
-        m = m["test"]
-        out[cond] = from_lhotse(m["recordings"], m["supervisions"], "zh")
+    root = DS / "alimeeting" / "Test_Ali"
+    out = {"near": [], "far": []}
+    for cond in ["near", "far"]:
+        d = root / f"Test_Ali_{cond}"
+        for tgf in sorted((d / "textgrid_dir").glob("*.TextGrid")):
+            stem = tgf.stem
+            if cond == "far":
+                wavs = sorted((d / "audio_dir").glob(f"{stem}_MS*.wav"))
+                assert len(wavs) == 1, (tgf, wavs)
+                wav, session = wavs[0], stem
+            else:
+                wav, session = d / "audio_dir" / f"{stem}.wav", stem.split("_N_")[0]
+            tg = textgrid.TextGrid.fromFile(str(tgf))
+            for tier in tg.tiers:
+                spk = tier.name if cond == "far" else stem.split("_N_")[1]
+                for k, iv in enumerate(tier.intervals):
+                    if iv.mark and iv.mark.strip():
+                        out[cond].append(row(f"{session}_{spk}_{k:05d}", session, spk, wav, 0,
+                                             iv.minTime, iv.maxTime, iv.mark, "zh"))
     return out
 
 
