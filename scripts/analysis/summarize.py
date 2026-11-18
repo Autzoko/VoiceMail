@@ -138,15 +138,21 @@ def regression(df):
     rhs = " + ".join(f"C({f}, Treatment('{REF_LEVEL[f]}'))" for f in ["ovl_bin", "dur_bin", "snr_bin", "content"])
     for model, mode, grp, dist, sub, extra in fits:
         sub = sub[sub.snr_bin != "NA"]
+        # the formula API silently drops rows with NaN; drop them first so offset/cluster groups stay aligned
+        used = ["n_ref", "cluster", "ovl_bin", "dur_bin", "snr_bin", "content"] + \
+               (["dataset"] if "dataset" in extra else []) + (["native"] if "native" in extra else [])
+        sub = sub.dropna(subset=used)
+        sub = sub[sub.n_ref > 0]
         for c in cats:
-            if sub[c].sum() < 30:
+            d = sub.dropna(subset=[c])
+            if d[c].sum() < 30:
                 continue
             try:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
-                    m = smf.glm(f"{c} ~ {extra}{rhs}", data=sub, family=sm.families.Poisson(),
-                                offset=np.log(sub.n_ref)).fit(cov_type="cluster",
-                                                              cov_kwds={"groups": pd.factorize(sub.cluster)[0]})
+                    m = smf.glm(f"{c} ~ {extra}{rhs}", data=d, family=sm.families.Poisson(),
+                                offset=np.log(d.n_ref)).fit(cov_type="cluster",
+                                                            cov_kwds={"groups": pd.factorize(d.cluster)[0]})
             except Exception as e:  # noqa: BLE001
                 print(f"fit failed {model} {mode} {grp} {dist} {c}: {e}")
                 continue
@@ -160,7 +166,7 @@ def regression(df):
                              "category": "ALL" if c == "E" else c, "factor": f, "level": lvl,
                              "ref_level": REF_LEVEL.get(f, ""), "rate_ratio": np.exp(m.params[term]),
                              "lo": np.exp(ci.loc[term, 0]), "hi": np.exp(ci.loc[term, 1]), "p": m.pvalues[term],
-                             "n_utts": len(sub), "n_events": int(sub[c].sum())})
+                             "n_utts": len(d), "n_events": int(d[c].sum())})
     return pd.DataFrame(rows).round(4)
 
 
