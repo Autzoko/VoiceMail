@@ -1,0 +1,2 @@
+n_words,start_med_ms,start_p90_ms,end_med_ms,end_p90_ms,start_within_100ms,start_within_200ms
+184616,50.0,100.0,60.0,140.0,0.896,0.979
