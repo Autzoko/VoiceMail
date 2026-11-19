@@ -54,6 +54,15 @@ snapshot_download("microsoft/NOTSOFAR", repo_type="dataset", local_dir=".", max_
                   allow_patterns=[f"{p}/*.json", f"{p}/close_talk/*.wav", f"{p}/sc_*/ch0.wav"])
 EOF
   ;;
+libricss)
+  # LibriCSS (Chen et al. 2020): LibriSpeech utterances replayed in a real meeting room, 10 x 1 h sessions,
+  # overlap 0S/0L/OV10-OV40, 7-ch circular array. Official Google Drive file (lhotse recipe id); if Drive refuses,
+  # fall back to the byte-identical HF mirror uglyducking/libri_css. ~6 GB zip.
+  . "$ROOT/env/activate.sh"
+  ( pip install -q gdown >/dev/null 2>&1 && gdown -q 1Piioxd5G_85K9Bhcr8ebdhXx0CnaHy7l -O for_release.zip ) || \
+    python -c "from huggingface_hub import hf_hub_download as d; d('uglyducking/libri_css', 'for_release.zip', repo_type='dataset', local_dir='.')"
+  unzip -q for_release.zip && rm -f for_release.zip
+  ;;
 librispeech)
   # Sanity check only: LibriSpeech test-clean (OpenSLR 12), to reproduce Qwen3-ASR's published WER.
   pget https://openslr.trmal.net/resources/12/test-clean.tar.gz test-clean.tar.gz
