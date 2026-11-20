@@ -1,0 +1,491 @@
+<title>语音流水线 Harness 与 RSI</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@600;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a single reading column (~68ch) with a sticky contents rail on wide screens; diagrams and tables break out to a wider measure. */
+:root{
+  --bg:#f5f7f6; --surface:#ffffff; --fg:#17201d; --muted:#56635e; --line:#d7dfdb;
+  --accent:#0f6b5c; --accent-soft:#e1efeb; --warn:#a4560c; --warn-soft:#f8ead9; --bad:#a3282f; --bad-soft:#f7e1e2; --ok:#2e6b2f; --ok-soft:#e3f0e1;
+  --code-bg:#eef2f0;
+  --f-display:"Noto Serif SC","Songti SC","STSong",serif;
+  --f-body:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#101614; --surface:#161e1b; --fg:#e4ebe8; --muted:#9aa9a3; --line:#2a3632;
+  --accent:#5cc4ae; --accent-soft:#17312b; --warn:#e3a35a; --warn-soft:#33261a; --bad:#ef8a8f; --bad-soft:#3a1d20; --ok:#8fcf8a; --ok-soft:#1c2f1c;
+  --code-bg:#1b2521; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#101614; --surface:#161e1b; --fg:#e4ebe8; --muted:#9aa9a3; --line:#2a3632;
+  --accent:#5cc4ae; --accent-soft:#17312b; --warn:#e3a35a; --warn-soft:#33261a; --bad:#ef8a8f; --bad-soft:#3a1d20; --ok:#8fcf8a; --ok-soft:#1c2f1c;
+  --code-bg:#1b2521; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.75;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 64px}
+a{color:var(--accent);text-underline-offset:2px}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1120px;margin:0 auto;display:grid;grid-template-columns:220px minmax(0,1fr);gap:48px}
+nav.toc{position:sticky;top:env(safe-area-inset-top,0px);align-self:start;padding-top:40px;font-size:13.5px;line-height:1.6}
+nav.toc .grp{font-size:11.5px;letter-spacing:.08em;color:var(--muted);margin:18px 0 6px;font-weight:700}
+nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:3px 0 3px 10px;border-left:2px solid var(--line)}
+nav.toc a:hover{color:var(--fg);border-left-color:var(--accent)}
+main{min-width:0;padding-top:40px}
+.prose{max-width:68ch}
+header.hero{padding-bottom:28px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.06em;color:var(--accent);text-transform:uppercase}
+h1{font-family:var(--f-display);font-weight:800;font-size:clamp(28px,4.6vw,44px);line-height:1.25;margin:10px 0 14px;text-wrap:balance}
+.lede{font-size:17.5px;color:var(--fg);max-width:64ch;margin:0}
+.meta{font-size:13px;color:var(--muted);margin-top:14px}
+h2{font-family:var(--f-display);font-weight:800;font-size:clamp(22px,3vw,28px);line-height:1.35;margin:64px 0 12px;text-wrap:balance;scroll-margin-top:20px}
+h3{font-size:18px;margin:34px 0 8px;font-weight:700;text-wrap:balance}
+.part{font-family:var(--f-mono);font-size:12px;letter-spacing:.1em;color:var(--muted);margin-top:72px;padding-top:18px;border-top:2px solid var(--fg)}
+.part + h2{margin-top:10px}
+p{margin:0 0 14px}
+ul,ol{margin:0 0 14px;padding-left:1.3em}
+li{margin:4px 0}
+strong{font-weight:700}
+code{font-family:var(--f-mono);font-size:.88em;background:var(--code-bg);padding:1px 5px;border-radius:4px}
+.tldr{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px 22px;margin:28px 0 0}
+.tldr h2{margin:0 0 10px;font-size:19px}
+.tldr ol{margin:0}
+.tag{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;vertical-align:1px;white-space:nowrap}
+.t-ev{background:var(--accent-soft);color:var(--accent)}
+.t-ours{background:var(--warn-soft);color:var(--warn)}
+.t-exp{background:var(--ok-soft);color:var(--ok)}
+.legend{display:flex;flex-wrap:wrap;gap:10px 18px;font-size:13px;color:var(--muted);margin:16px 0 0}
+.legend span{display:flex;gap:6px;align-items:center}
+.analogy{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:18px 0 20px}
+.analogy div{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+.analogy b{display:block;font-size:13px;color:var(--accent);margin-bottom:4px}
+.analogy p{margin:0;font-size:14.5px;line-height:1.65}
+/* harness anatomy */
+.anatomy{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:18px;margin:18px 0 22px}
+.anatomy .shell{border:2px dashed var(--accent);border-radius:10px;padding:14px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;position:relative}
+.anatomy .shell-label{grid-column:1/-1;font-family:var(--f-mono);font-size:12px;color:var(--accent);letter-spacing:.05em}
+.anatomy .cell{border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-size:13.5px;line-height:1.55;background:var(--bg)}
+.anatomy .cell b{display:block;font-size:13.5px}
+.anatomy .core{grid-column:2;grid-row:3;background:var(--fg);color:var(--bg);border-color:var(--fg);text-align:center;display:flex;flex-direction:column;justify-content:center}
+.anatomy .core small{opacity:.75}
+/* loop */
+.loop{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;margin:18px 0 6px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface)}
+.loop .st{padding:14px 14px 16px;border-right:1px solid var(--line);position:relative}
+.loop .st:last-child{border-right:0}
+.loop .n{font-family:var(--f-mono);font-size:12px;color:var(--accent)}
+.loop .st b{display:block;margin:2px 0 4px}
+.loop .st p{font-size:13.5px;line-height:1.6;margin:0;color:var(--muted)}
+.loop-back{font-size:13px;color:var(--muted);text-align:center;margin:0 0 22px;font-family:var(--f-mono)}
+/* tables */
+.tbl{overflow-x:auto;margin:16px 0 22px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.6}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{font-size:12.5px;color:var(--muted);font-weight:700;background:var(--bg);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+td .gap{color:var(--bad)}
+.wide{min-width:760px}
+/* pipeline diagram */
+.pipe{margin:20px 0 10px;overflow-x:auto}
+.pipe-inner{min-width:820px;display:grid;grid-template-columns:1fr 26px 1fr 26px 1.15fr 26px 1fr 26px 1fr;align-items:stretch}
+.box{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.55}
+.box b{display:block;font-size:13.5px}
+.box .id{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.arrow{display:flex;align-items:center;justify-content:center;color:var(--muted);font-family:var(--f-mono)}
+.gate{border:2px solid var(--warn);background:var(--warn-soft)}
+.gate b{color:var(--warn)}
+.stack{display:grid;gap:8px}
+.pipe-note{font-size:13px;color:var(--muted);margin:6px 0 22px}
+.rule{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:14px 0 20px}
+.rule h4{margin:0 0 8px;font-size:15px}
+.rule ol{margin:0}
+.formula{font-family:var(--f-mono);font-size:14px;background:var(--code-bg);padding:10px 12px;border-radius:6px;overflow-x:auto;margin:8px 0 10px;white-space:nowrap}
+pre{font-family:var(--f-mono);font-size:12.5px;line-height:1.6;background:var(--code-bg);border-radius:8px;padding:14px 16px;overflow-x:auto;margin:12px 0 20px}
+.stat-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:16px 0 22px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+.stat .v{font-family:var(--f-mono);font-size:24px;font-weight:600;color:var(--bad);font-variant-numeric:tabular-nums}
+.stat .v.good{color:var(--accent)}
+.stat p{margin:4px 0 0;font-size:13.5px;line-height:1.55;color:var(--muted)}
+.callout{border-left:3px solid var(--accent);padding:4px 0 4px 16px;margin:18px 0;color:var(--fg)}
+.callout.warn{border-left-color:var(--warn)}
+.gaps{counter-reset:g;list-style:none;padding:0;margin:14px 0 20px;display:grid;gap:8px}
+.gaps li{counter-increment:g;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 14px 10px 46px;position:relative;margin:0}
+.gaps li::before{content:counter(g);position:absolute;left:14px;top:10px;font-family:var(--f-mono);font-weight:600;color:var(--bad)}
+footer{margin-top:72px;padding-top:18px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
+@media (max-width:900px){
+  .wrap{grid-template-columns:minmax(0,1fr);gap:0}
+  nav.toc{display:none}
+}
+@media (max-width:640px){
+  .analogy,.stat-row{grid-template-columns:minmax(0,1fr)}
+  .anatomy .shell{grid-template-columns:minmax(0,1fr)}
+  .anatomy .core{grid-column:auto;grid-row:auto}
+  .loop{grid-template-columns:minmax(0,1fr)}
+  .loop .st{border-right:0;border-bottom:1px solid var(--line)}
+  .loop .st:last-child{border-bottom:0}
+  body{font-size:15.5px}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+html{scroll-behavior:smooth}
+</style>
+
+<div class="wrap">
+<nav class="toc" aria-label="目录">
+  <div class="grp">入门</div>
+  <a href="#what-harness">Harness 是什么</a>
+  <a href="#what-rsi">RSI 是什么</a>
+  <a href="#five-parts">范式的五个要素</a>
+  <a href="#evidence">做到了什么、卡在哪</a>
+  <a href="#speech">放到语音上的特殊之处</a>
+  <div class="grp">我们的流水线</div>
+  <a href="#pipeline">两类灾难性错误</a>
+  <a href="#literature">已有论文做到哪</a>
+  <a href="#audar">Audar 的定位</a>
+  <a href="#architecture">Harness 架构</a>
+  <a href="#rsi-design">RSI 设计</a>
+  <a href="#roadmap">路线图与实验</a>
+  <a href="#risks">风险</a>
+  <a href="#conclusion">结论</a>
+</nav>
+
+<main>
+<header class="hero">
+  <div class="eyebrow">VoiceMail · 调研报告 · 2026-11-20</div>
+  <h1>语音流水线的 Harness 与 RSI</h1>
+  <p class="lede">怎样在 Qwen3-ASR + Audar 的会议转写流水线外面，搭一个能自动变好的控制层；以及在动手之前，Harness 和 RSI 到底是什么。</p>
+  <p class="meta">适用场景：会议室、论坛、讲座；近场与远场麦克风；领域词表；阿拉伯语、英语为主，兼顾中文。文献检索截至 2026 年 11 月。</p>
+  <div class="legend">
+    <span><i class="tag t-ev">文献</i> 已发表论文或厂商资料中的数字</span>
+    <span><i class="tag t-exp">本项目实验</i> 我们自己测的</span>
+    <span><i class="tag t-ours">我们的提议</i> 设计或推算，尚未测量</span>
+  </div>
+</header>
+
+<section class="tldr" aria-labelledby="tldr-h">
+  <h2 id="tldr-h">一页结论</h2>
+  <ol>
+    <li><strong>Harness</strong> 是包在模型外面的程序：决定模型看到什么、调用哪个工具、出错时怎么回退、结果怎么检查。<strong>RSI</strong>（递归自我改进）是让系统自己提出修改、用评测器打分、只保留变好的修改，再在新版本上继续改。</li>
+    <li>这套方法确实有效，但收益是<strong>有上限的台阶</strong>：几十轮迭代后就饱和，而且天花板由评测器决定。评测器能被钻空子时，系统会学会作弊。</li>
+    <li><strong>没有论文</strong>在完整的"说话人分离 → 语种识别 → 多个识别模型分流"流程外面做过 Harness 或 RSI 闭环。各个环节都有零件，没有人把它们接起来。</li>
+    <li>我们流水线里最贵的错误是两类"流畅但错得离谱"的输出：<strong>Audar 把中英文翻译成阿拉伯语</strong>，以及<strong>远场重叠时转写成另一个人的话（SWAP）</strong>。纯文本检查发现不了它们，所以控制层必须看声学证据：语种后验和信噪比。</li>
+    <li>建议先手写两道有因果依据的闸门（语种闸门、信噪比闸门），再让 RSI 去搜索阈值、回退顺序和代码。</li>
+  </ol>
+</section>
+
+<div class="part">第一部分 · 入门</div>
+<h2 id="what-harness">Harness 是什么</h2>
+<div class="prose">
+<p>先用一个比喻。把识别模型想成一位厨师：手艺是训练出来的，短期内改不了。但同一位厨师在不同的厨房里，出菜质量可以差很多。</p>
+</div>
+<div class="analogy">
+  <div><b>模型</b><p>厨师本人。能力由训练决定，改它要重新训练，代价高。</p></div>
+  <div><b>Harness</b><p>厨房和流程：备什么料、按什么顺序做、哪道菜交给哪位厨师、出菜前谁来试味。</p></div>
+  <div><b>RSI</b><p>厨房根据每天的试菜记录，自己修改流程和分工，只保留让菜变好的改动。</p></div>
+</div>
+<div class="prose">
+<p>学术上的定义来自 2026 年 3 月的 Meta-Harness 论文：harness 是"包住语言模型、决定模型看到什么上下文的有状态程序" <a href="https://arxiv.org/html/2603.28052v1">[Meta-Harness]</a>。放到语音识别里，它包括下面这些部分：</p>
+</div>
+<div class="anatomy" role="img" aria-label="Harness 的组成：模型位于中央，外围是输入准备、上下文、路由、工具、验证、回退和轨迹记录">
+  <div class="shell">
+    <div class="shell-label">HARNESS：模型之外、由我们写的程序</div>
+    <div class="cell"><b>输入准备</b>切分音频、选麦克风通道、语音分离</div>
+    <div class="cell"><b>上下文</b>把领域词表、议程、幻灯片里的术语放进提示</div>
+    <div class="cell"><b>路由</b>这一段交给 Qwen3-ASR 还是 Audar</div>
+    <div class="cell"><b>工具</b>说话人分离、语种识别、对齐器、LLM 纠错</div>
+    <div class="cell core"><b>识别模型</b><small>权重冻结</small></div>
+    <div class="cell"><b>验证</b>文字体系对不对、有没有复读、长度是否合理</div>
+    <div class="cell"><b>回退</b>验证没过就换模型、换通道或重新解码</div>
+    <div class="cell"><b>记忆</b>积累下来的纠错规则和领域知识</div>
+    <div class="cell"><b>轨迹</b>每一段的所有中间决策都记下来，供复盘</div>
+  </div>
+</div>
+<div class="prose">
+<p><strong>只改 harness 能差多少？</strong> <span class="tag t-ev">文献</span> Meta-Harness 引用的一个例子里，同一个模型只换 harness，成绩相差 6 倍。它自动搜出来的 harness 在文本分类上得 48.6，人工设计的 ACE 是 40.9，而且用的上下文少 4 倍。HarnessCompass 在 SWE-bench Verified 上把留出集成绩从 51.6% 提到 60.4% <a href="https://arxiv.org/html/2608.01918v1">[HarnessCompass]</a>。OpenAI 和 Anthropic 2026 年也都把 "harness engineering" 当作独立的工程方向来讲。</p>
+<p>对语音识别来说，我们在实验里已经见过 harness 的威力：Audar 让它自己判断语种时，会把 82% 的中文对话句子输出成阿拉伯语；只要在调用前强制指定语种，这个错误就消失。模型一点没变，变的是外面的规则。</p>
+</div>
+
+<h2 id="what-rsi">RSI 是什么</h2>
+<div class="prose">
+<p>RSI 是 recursive self-improvement 的缩写，意思是递归自我改进。核心是一个循环：系统提出对自己的修改，评测器打分，变好了就保留，然后在新版本上继续提修改。"递归"指的是改进后的系统又成为下一轮改进的起点。</p>
+</div>
+<div class="loop" role="img" aria-label="RSI 循环：提议、执行、评测、晋升，然后回到提议">
+  <div class="st"><div class="n">1 提议</div><b>提议者写出修改</b><p>通常是一个编码 agent 或 LLM，读取历史版本和它们的运行轨迹，提出新版本：改阈值、改代码、改提示，或生成训练数据。</p></div>
+  <div class="st"><div class="n">2 执行</div><b>在搜索集上跑</b><p>新版本在一批带标注的数据上运行，留下完整轨迹。</p></div>
+  <div class="st"><div class="n">3 评测</div><b>锁死的评测器打分</b><p>评测器由人写好、提议者无权修改。语音里就是固定的文本规整器和 WER 统计脚本。</p></div>
+  <div class="st"><div class="n">4 晋升</div><b>过门才保留</b><p>在另一份没见过的选择集上也不退化，才算真的变好，进入存档。</p></div>
+</div>
+<p class="loop-back">↻ 存档里的版本成为下一轮的起点</p>
+<div class="prose">
+<p>被修改的对象可以分成四层，从便宜到昂贵：</p>
+</div>
+<div class="tbl"><table class="wide">
+  <thead><tr><th>层级</th><th>改什么</th><th>代表方法</th><th>代价</th></tr></thead>
+  <tbody>
+    <tr><td><b>L0 参数</b></td><td>阈值、数值配置</td><td>Optuna 等贝叶斯优化</td><td>极低，可以在缓存结果上反复重放</td></tr>
+    <tr><td><b>L1 代码</b></td><td>流程逻辑、路由、回退顺序</td><td>Meta-Harness、Darwin Gödel Machine（DGM）、AlphaEvolve、ADAS</td><td>中等，每个候选要重跑一部分</td></tr>
+    <tr><td><b>L2 上下文</b></td><td>提示词、词表、规则记忆</td><td>GEPA、ACE、Voice Memory</td><td>低，几百条标注就够</td></tr>
+    <tr><td><b>L3 权重</b></td><td>模型本身</td><td>伪标签自训练、STaR / ReST、GRPO 强化学习</td><td>高，需要 GPU 训练，有遗忘和崩溃风险</td></tr>
+  </tbody>
+</table></div>
+<div class="prose">
+<p>Harness 和 RSI 结合起来，就是"让 harness 自己进化"：模型权重先不动，让 agent 反复改外层程序，用评测器把关。这是 2025–2026 年最活跃的方向，因为它比训练模型便宜得多，也更容易审计。</p>
+</div>
+
+<h2 id="five-parts">范式的五个要素</h2>
+<div class="prose">
+<p>不管具体用哪种方法，一个能用的 Harness + RSI 系统都离不开这五样东西。设计时逐条检查，比挑哪个算法更重要。</p>
+<ol>
+  <li><strong>可修改对象</strong>：明确允许改什么（阈值、某几个文件、提示模板），其余一律只读。改动越小、越容易审计，越安全。</li>
+  <li><strong>提议者</strong>：通常是编码 agent。Meta-Harness 的消融实验说明，让它读<strong>原始运行轨迹</strong>远比只给分数有用：中位数 50.0 对 34.6；给 LLM 写的摘要也只有 34.9。</li>
+  <li><strong>评测器</strong>：决定系统往哪里进化，也决定天花板。必须锁死，提议者碰不到。DGM 就出过事：它通过删掉幻觉检测标记来"完成"任务 <a href="https://sakana.ai/dgm/">[Sakana DGM]</a>。</li>
+  <li><strong>三份互不重叠的数据</strong>：搜索集给提议者看，选择集用来决定是否保留，测试集最后只报一次。语音数据要按会议和说话人切，不能按句子随机抽，否则同一个人的声音会同时出现在两边。</li>
+  <li><strong>晋升门与存档</strong>：只接受在选择集上严格变好、且各子集都不退化的修改；所有历史版本都留着，可以回滚，也可以从旧版本分叉。</li>
+</ol>
+</div>
+
+<h2 id="evidence">做到了什么、卡在哪</h2>
+<div class="tbl"><table class="wide">
+  <thead><tr><th>系统</th><th>自我修改的对象</th><th>报告的结果</th><th>要点</th></tr></thead>
+  <tbody>
+    <tr><td><a href="https://sakana.ai/dgm/">Darwin Gödel Machine</a></td><td>agent 自身代码</td><td class="num">SWE-bench 20 → 50%</td><td>收益主要来自更好的工具和流程；曾钻评测空子</td></tr>
+    <tr><td><a href="https://arxiv.org/html/2603.28052v1">Meta-Harness</a></td><td>外层 harness 代码</td><td class="num">48.6 对 ACE 40.9</td><td>提议者读原始轨迹是关键；一次约 60 个候选</td></tr>
+    <tr><td><a href="https://arxiv.org/html/2608.01918v1">HarnessCompass</a></td><td>harness 代码</td><td class="num">留出集 51.6 → 60.4%</td><td>不加约束时搜索集涨到 66%，留出集只有 55.8%，过拟合明显</td></tr>
+    <tr><td><a href="https://arxiv.org/abs/2507.19457">GEPA</a></td><td>提示词</td><td class="num">平均比 GRPO 高 6%</td><td>所需尝试次数最多少 35 倍；样本效率远高于强化学习</td></tr>
+    <tr><td><a href="https://arxiv.org/html/2607.26410v1">Voice Memory</a>（NVIDIA）</td><td>纠错规则记忆</td><td class="num">加权 WER 8.36 → 7.52%</td><td>语音领域最接近的例子；没有任何领域变差，学到的规则多是"别乱改"</td></tr>
+    <tr><td>ReHear（伪标签自训练）</td><td>模型权重</td><td class="num">8.98 → 6.30 → 6.43 → 6.42</td><td>第 1 轮之后基本不再进步；普通伪标签会强化自己的错误</td></tr>
+    <tr><td>进化提示做 LLM 纠错</td><td>纠错提示</td><td class="num">CHiME-4 7.49 → 4.88</td><td>换到 WSJ 反而从 3.67 恶化到 14.75，严重过拟合</td></tr>
+  </tbody>
+</table></div>
+<div class="prose">
+<p class="callout warn">从这些结果可以读出三条规律。第一，收益在几十轮内饱和，没有看到无限复利。第二，评测器越容易被钻空子，越会学到作弊；验证器的质量就是天花板。第三，搜索集上的提升会打折扣，要以留出集为准。</p>
+</div>
+
+<h2 id="speech">放到语音上的特殊之处</h2>
+<div class="prose">
+<ul>
+  <li><strong>好处：每个模块都有现成的局部指标。</strong>说话人分离有 DER，语种识别有准确率，识别有 WER。可以先找出哪个模块拖后腿，再把搜索预算花在那里。</li>
+  <li><strong>好处：解码结果可以缓存。</strong>两个模型在所有片段上各跑一遍存下来，之后调阈值只是在 CPU 上重放选择逻辑，几乎不花钱。</li>
+  <li><strong>难点：标注少，评测器难建。</strong>没有参考文本时只能用模型间一致性或 LLM 评审代替，但每个被接受的改动都要在一小批人工标注上再确认。</li>
+  <li><strong>难点：最严重的错误在文字上看不出来。</strong>翻译成阿拉伯语的句子、转写成另一个人的话，都是流畅合法的文本。只看文字的纠错器和评审无能为力，必须引入声学证据。</li>
+</ul>
+</div>
+
+<div class="part">第二部分 · 我们的流水线</div>
+<h2 id="pipeline">两类灾难性错误</h2>
+<div class="prose">
+<p>现有流程是：说话人分离 → 语种识别 → 分流到 Qwen3-ASR（中文、英文等）或 Audar-ASR（阿拉伯语）→ 后处理。两个识别模型各有所长 <span class="tag t-exp">本项目实验</span>：</p>
+</div>
+<div class="tbl"><table>
+  <thead><tr><th>测试集</th><th>指标</th><th>Audar-ASR-V1-Turbo</th><th>Qwen3-ASR-1.7B</th></tr></thead>
+  <tbody>
+    <tr><td>Casablanca 阿联酋方言</td><td>WER</td><td class="num"><b>30.2</b></td><td class="num">45.7</td></tr>
+    <tr><td>SADA 沙特电视</td><td>WER</td><td class="num"><b>28.9</b></td><td class="num">43.2</td></tr>
+    <tr><td>Mixat 阿英混说</td><td>WER</td><td class="num"><b>17.1</b></td><td class="num">22.2</td></tr>
+    <tr><td>FLEURS 阿拉伯语朗读</td><td>WER</td><td class="num"><b>6.5</b></td><td class="num">9.7</td></tr>
+    <tr><td>ASCEND 中文对话（双方都指定语种）</td><td>MER</td><td class="num">14.4</td><td class="num"><b>6.8</b></td></tr>
+    <tr><td>FLEURS 英语（双方都指定语种）</td><td>WER</td><td class="num">6.7</td><td class="num"><b>4.8</b></td></tr>
+  </tbody>
+</table></div>
+<div class="prose"><p>分流本身没有问题，问题在于分错的代价极不对称：</p></div>
+<div class="stat-row">
+  <div class="stat"><div class="v">82%</div><p>Audar 自动判断语种时，ASCEND 中文对话句子被输出成阿拉伯文（多为翻译）。FLEURS 普通话 63%，FLEURS 英语 23%。</p></div>
+  <div class="stat"><div class="v">28%</div><p>远场重叠句子里，Qwen3-ASR 至少有一处转写成了干扰者的话（SWAP）。约每 100 词 15.6 个错误。</p></div>
+  <div class="stat"><div class="v good">5 dB</div><p>目标比干扰者响 5 dB 以上时，SWAP 基本消失（受控重混：0 dB +8.8，5 dB +2.1，10 dB +0.6）。</p></div>
+</div>
+<div class="prose">
+<p>这两类错误有共同点：输出流畅、置信度高，任何只看文字的检查都放行。相比之下，幻觉、空输出、语种识别错误加起来不到 0.3%。所以这条流水线上，harness 的首要任务不是把平均准确率再抠高一点，而是<strong>拦住这两种灾难性失败</strong>。</p>
+</div>
+
+<h2 id="literature">已有论文做到哪</h2>
+<div class="prose">
+<p>按环节梳理，结论很一致：<strong>单个环节的方法很成熟，跨环节的控制和自我改进几乎空白。</strong></p>
+<p>与我们最接近的是 MLC-SLM 2026 比赛的 HINTT 系统：DiariZen 微调 → 微调后的 Qwen3-ASR → LLM 纠错，tcpWER 15.28，好过统一的端到端模型（18.50）。说话人分离经微调后 DER 从 17.04 降到 3.25，LLM 纠错只贡献约 0.2。但它是人工调参的一次性工程，没有自动改进循环，也没做"把某个模块换成真值看损失多少"的消融 <a href="https://arxiv.org/html/2610.08063">[HINTT]</a>。另一个系统把 Qwen3-ASR-1.7B 接在分离前端后面做 GRPO，tcpMER 改善 6.83 个点，主要收益来自监督微调 <a href="https://arxiv.org/abs/2607.08208">[2607.08208]</a>。</p>
+</div>
+<div class="tbl"><table class="wide">
+  <thead><tr><th>环节</th><th>代表文献做到的程度</th><th>还没人做的</th></tr></thead>
+  <tbody>
+    <tr><td><b>说话人分离</b></td><td>DiariZen：AMI 14.0、AliMeeting 12.5 DER；pyannote community-1 比 3.1 版更好。Audar-Diarization-V1 是 NVIDIA Sortformer 的 8 人扩展，<b>训练和评测都不含阿拉伯语</b>。唯一的阿拉伯语 DER 来自 12 个文件的厂商测试。</td><td class="gap">没有公开的阿拉伯语会议分离评测集；没有以下游 WER 为目标的分离调参</td></tr>
+    <tr><td><b>语种识别与分流</b></td><td>Qwen3-ASR 的语种识别在朗读语音上 98.7–99.9%，对话语音 94.1%。1 秒以下的片段准确率急剧下降。模型内部按语种分专家的方法，在语种判错时会崩溃。</td><td class="gap">没人量化过语种判错在两个独立识别模型之间造成的损失；"输出了错误语种/翻译"没有指标</td></tr>
+    <tr><td><b>重叠语音识别</b></td><td>CocktailASR-1 用目标说话人的参考音频引导 Qwen3 解码，AMI 远场 WER 21.81，对比 Qwen3-ASR-1.7B 的 38.18，但用了约 100 万小时数据且未开源。SE-DiCoW 让 Whisper 参考分离结果，tcpWER 相对降 52.4%。</td><td class="gap">没有按信噪比决定是否重新识别的系统</td></tr>
+    <tr><td><b>说话人标签修正</b></td><td>DiarizationLM 在英文电话录音上把说话人归属错误相对降 25–55%。SEAL 发现不带声学信息的 LLM 会把结果改差（15.52 → 17.5）。纠错器换一个识别模型就不灵。</td><td class="gap">没有中文、阿拉伯语或远场多人会议结果；没人用修正后的标签反过来再训练分离模型</td></tr>
+    <tr><td><b>单路识别的自我改进</b></td><td>Voice Memory 的规则记忆（WER 8.36 → 7.52）；RECOVER 实体纠错 agent；Google 的交互式会议说话人纠错，DER 相对降 32%。</td><td class="gap">都不涉及语种识别和多模型分流；没有以说话人归属错误率（cpWER）为目标的进化</td></tr>
+    <tr><td><b>多模块自动优化</b></td><td>Optimas 用每个模块的局部奖励统一优化提示、参数、模型选择，平均提升 11.92%；MASS 证明先逐模块调、再调整体结构最划算；ADOPT 按模块间依赖分配功劳。</td><td class="gap">没有一个用在含连续阈值的语音流程上</td></tr>
+  </tbody>
+</table></div>
+<div class="prose"><p>能直接写成论文章节的空白：</p></div>
+<ol class="gaps">
+  <li>"通用模型 + 专用模型"之间语种分流出错的损失有多大，以及由此推出的不对称阈值。</li>
+  <li>"输出错误语种或翻译"的标准指标。我们提议叫输出文字不匹配率（SMR）。</li>
+  <li>以 cpWER/tcpWER 为目标、带锁死评测器的自我改进循环。</li>
+  <li>识别修正说话人标签 → 再训练分离模型的多轮闭环。</li>
+  <li>把信噪比当作路由变量来抑制 SWAP，并验证它的因果效果。</li>
+  <li>公开的阿拉伯语多人会议说话人分离评测集。</li>
+</ol>
+
+<h2 id="audar">Audar 的定位：只执行，不裁决</h2>
+<div class="prose">
+<p><span class="tag t-ev">文献</span> Audar-ASR-V1-Turbo 由 0.32B 编码器和 2.03B 解码器组成，与 Qwen3-ASR-1.7B 的结构一致，附带 Qwen3-ASR 的代码，用 <code>qwen-asr</code> 或 vLLM 推理。训练的最后一步是偏好对齐（KTO），奖励阿拉伯语的书写规范 <a href="https://huggingface.co/audarai/Audar-ASR-V1-Turbo">[Audar 模型卡]</a>。厂商自己写明：<strong>强制指定语种是必须的</strong>；输出 <code>language None</code> 时要当作空结果，否则音乐或静音会引发复读。模型卡没有公布任何中英文结果，也没说明热词功能的效果。许可证限制大规模商用。</p>
+<p><span class="tag t-ours">我们的推断</span> Audar 很可能是 Qwen3-ASR-1.7B 的微调版。由此得出几条设计约束：</p>
+<ul>
+  <li><strong>语种只由 Qwen3-ASR 判断</strong>，Audar 只在判为阿拉伯语时、以强制阿拉伯语的方式调用。</li>
+  <li>两个模型的置信度不能直接比大小，偏好对齐改变了 Audar 的置信度分布。</li>
+  <li>两者同源，错误很可能相关。拿"两个模型结果一致"筛伪标签不够可靠，要再加一个不同结构的模型（例如 CTC 模型）做验证。</li>
+  <li>Qwen3 的强制对齐模型只支持 11 种语言，<strong>不含阿拉伯语</strong>。阿拉伯语逐词时间戳要换 MMS 或 wav2vec2 阿拉伯语对齐器。</li>
+</ul>
+</div>
+
+<h2 id="architecture">Harness 架构：七个模块、两道闸门</h2>
+<div class="prose"><p><span class="tag t-ours">我们的提议</span> 骨架是确定性的流程，上面挂着可以被自动搜索的策略点；每个片段都留下完整轨迹。</p></div>
+<div class="pipe" role="img" aria-label="流水线：前端与分离，语种闸门，信噪比闸门与解码，验证，后处理">
+  <div class="pipe-inner">
+    <div class="stack">
+      <div class="box"><span class="id">M1</span><b>前端与分离</b>多通道波束形成；DiariZen、pyannote、Audar-Diar 三者融合；标出重叠区</div>
+      <div class="box"><span class="id">M4</span><b>上下文构建</b>从议程、幻灯片、讲义、名单建词表，按片段检索 top-k</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="box gate"><span class="id">M2 · 闸门一</span><b>语种闸门</b>Qwen3 的语种概率为主；独立的语种分类器作旁证；同一说话人的历史语种做平滑</div>
+    <div class="arrow">→</div>
+    <div class="stack">
+      <div class="box gate"><span class="id">M3 · 闸门二</span><b>信噪比闸门</b>估计目标与干扰者的能量比，低于 5 dB 就换输入或换条件</div>
+      <div class="box"><span class="id">M5</span><b>解码执行</b>Qwen3-ASR（zh/en/ar 或自动）；Audar（只许强制 ar）；0.6B 作为 SWAP 探针</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="box"><span class="id">M6</span><b>验证器</b>文字体系、语速、复读、翻译签名；中间带做跨模型一致性；只对实体片段做受约束的 LLM 评审</div>
+    <div class="arrow">→</div>
+    <div class="box"><span class="id">M7</span><b>后处理</b>保持原词不变的说话人标签修正；实体纠错</div>
+  </div>
+</div>
+<p class="pipe-note">橙色框是两道闸门，它们看的是声学证据，不是文字。窄屏时可以左右滑动查看。</p>
+
+<div class="rule">
+  <h4>闸门一：语种闸门的规则</h4>
+  <p>阈值不取 0.5，而由不对称代价推出。阿拉伯语片段送 Audar 的收益 G 约 10 个 WER 点（本项目实验中是 3–15 点）；中英文片段被误送 Audar 的损失 L 约 100 点（几乎整句变成翻译）。</p>
+  <div class="formula">送 Audar 的条件：P(ar) &gt; L / (G + L) ≈ 100 / 110 ≈ 0.9</div>
+  <ol>
+    <li>P(ar) 在中间带（例如 0.4–0.9），或片段短于约 2 秒：两个模型都跑，按文字体系和交叉打分选一个。</li>
+    <li>短片段优先沿用同一说话人或相邻片段的语种，不逐段重新判断。</li>
+    <li>阿语为主的阿英混说送 Audar（Mixat 上 17.1 对 22.2），英语为主的送 Qwen3。</li>
+    <li>Audar 输出后再查"翻译签名"：判为中英文却输出了阿拉伯文，或长度与 Qwen3 的结果严重不符，就丢弃并退回 Qwen3。</li>
+  </ol>
+</div>
+
+<div class="rule">
+  <h4>闸门二：信噪比闸门的规则</h4>
+  <ol>
+    <li>对标出的重叠段估计信噪比：有近场通道就用近远场能量比，没有就用分离后各路的能量比。</li>
+    <li>≥ 5 dB：直接识别。</li>
+    <li>&lt; 5 dB：依次尝试切换到近场通道、分离或提取目标说话人后重新识别。分离前端会带来失配，需要用分离后的音频适配识别模型（USTC 这样做后 tcpWER 从 16.57 降到 12.07）。</li>
+    <li>三人以上同时说话的片段标为低可信度，不强行转写。</li>
+    <li>SWAP 探针：对齐假设中的每个词，比较这个词的声音更像目标说话人还是干扰者；1.7B 与 0.6B 在重叠段上分歧大时也可疑。探针要先在我们的重混数据上校准，那里每个词属于谁是已知的。</li>
+  </ol>
+</div>
+
+<div class="prose">
+<h3>词表注入与验证器</h3>
+<p>Qwen3-ASR 训练时用过带上下文的数据，但论文没有报告效果数字。外部对比发现语音大模型对词表里的干扰词数量和<strong>词的顺序</strong>都很敏感 <a href="https://arxiv.org/abs/2608.05759">[Huber &amp; Waibel]</a>，所以 top-k 数量、排序和模板都应该交给搜索。大词表要先检索再注入。Audar 的上下文功能效果未知，需要单独测。</p>
+<p>LLM 纠错只在拿得准的地方用：不带置信度的纠错曾把 WER 从 10.83% 推到 20.01%，加入逐词置信度后回到 10.58%。CHiME 综述也指出，LLM 后处理在真实远场会议上只有边际收益。</p>
+<h3>轨迹格式</h3>
+<p>RSI 的提议者靠读轨迹找问题，所以每个片段的所有中间决策都要记下来，一行一个片段：</p>
+</div>
+<pre>{"run_id":"h-0042","session":"mtg_017","seg_id":"mtg_017_s0193","t":[812.40,816.95],
+ "diar":{"spk":"S3","conf":0.81,"overlap_ratio":0.42,"n_active":2},
+ "lid":{"qwen_probs":{"ar":0.12,"en":0.85,"zh":0.03},"ecapa":"en","spk_prior":{"en":0.93},"final":"en","band":"confident"},
+ "sir":{"est_db":1.8,"method":"css_energy","gate":"redecode"},
+ "context":{"source":["agenda","slides_p12"],"terms":["NOTSOFAR","tcpWER"],"k":12},
+ "decodes":[{"model":"qwen3-1.7b","lang":"en","input":"farfield","lp":-0.31},
+            {"model":"qwen3-1.7b","lang":"en","input":"css_stream_1","lp":-0.22}],
+ "verify":{"script_ok":true,"cps":13.1,"rep":false,"swap_probe":{"flag_words":3}},
+ "select":{"chosen":1,"reason":"sir_redecode+swap_probe"},
+ "cost":{"gpu_s":1.7},
+ "ref_metrics":{"wer":0.18,"swap_per100":0.0,"del":0.04}}</pre>
+<div class="prose"><p><code>ref_metrics</code> 只出现在搜索集的轨迹里；选择集和测试集对提议者只返回汇总分数。所有解码结果按（片段、模型、语种、输入通道、上下文）缓存，这是控制成本的关键。</p></div>
+
+<h2 id="rsi-design">RSI 设计：四层改进，共用一个锁死的评测器</h2>
+<div class="tbl"><table class="wide">
+  <thead><tr><th>层级</th><th>被自动修改的对象</th><th>优化方法</th><th>局部指标</th><th>晋升条件</th></tr></thead>
+  <tbody>
+    <tr><td><b>L0 阈值</b></td><td>语种阈值与中间带、短片段时长、信噪比门限、分离聚类阈值、切分长度、词表 k</td><td>Optuna 多目标搜索（准确率对 GPU 时间），在缓存上重放</td><td>分路 WER、SMR、按时长分桶的语种错误率</td><td>选择集上各层都不退化</td></tr>
+    <tr><td><b>L1 代码</b></td><td>路由程序、回退顺序、SWAP 探针、重识别策略、验证器组合</td><td>Meta-Harness 式编码 agent，读历史源码和原始轨迹</td><td>完整指标组 + 真值替换阶梯</td><td>严格变好 + 跨语种不退化 + 人工审改动</td></tr>
+    <tr><td><b>L2 上下文</b></td><td>词表检索、排序、模板；按领域积累的规则</td><td>GEPA 式反思进化；Voice Memory 式小步增删改</td><td>术语错误率、非术语错误率、有害编辑率</td><td>每个领域都不退化</td></tr>
+    <tr><td><b>L3 权重</b></td><td>学出来的路由器；分离模型；Qwen3 目标说话人适配；阿拉伯语 LoRA</td><td>成对偏好训练路由器；多系统融合的伪标签；GRPO（WER + SWAP/删除惩罚）</td><td>路由准确率、DER、SWAP、领域 WER</td><td>冻结回归集 + 回放旧数据 + 伪标签比例上限</td></tr>
+  </tbody>
+</table></div>
+<div class="prose">
+<h3>打分：一组指标，而不是一个 WER</h3>
+<ul>
+  <li><strong>主指标按语种分开：</strong>英文用 tcpWER/cpWER（MeetEval），中文用对应的 CER，阿拉伯语用统一规整后的 WER 加 CER。</li>
+  <li><strong>说话人：</strong>DER、说话人数误差，以及 cpWER 与不计说话人 WER 之差（单独衡量归属错误）。</li>
+  <li><strong>语种：</strong>按 &lt;1 秒、1–2 秒、2–5 秒、&gt;5 秒分桶的语种错误率；SMR（输出文字与真实语种不符的句子比例）。</li>
+  <li><strong>重叠：</strong>每 100 词 SWAP 数、重叠词错误率、删除率。</li>
+  <li><strong>词表：</strong>术语错误率与非术语错误率，防止为了术语牺牲其余部分。</li>
+  <li><strong>成本：</strong>RTF、每小时音频的 GPU 秒数。</li>
+</ul>
+<h3>功劳怎么分给各模块：真值替换阶梯</h3>
+<p>在带标注的开发集上，依次把语种识别、说话人分离、路由（两个模型里取较好的）、输入（近场或理想分离）换成真值。相邻两级的差值，就是这个模块还能挖的空间。搜索预算按这个空间分配。HINTT 正好缺这一步。只有当某个局部指标的变化与整体指标高度相关时，才拿它代替整体指标去优化；文献已经发现 DER 最优和 WER 最优的分段设置可能方向相反。</p>
+<h3>防过拟合、防作弊</h3>
+<ul>
+  <li>搜索集、选择集、测试集按会议和说话人互斥。搜索集可以混入重混合成数据，选择集和测试集只用真实录音。</li>
+  <li>阿拉伯语固定留出整套数据集（例如 Casablanca-UAE 和 Mixat）作为域外测试，不按句子抽样。</li>
+  <li>跨语种闸门：在英文重叠数据上找到的改动，必须在阿拉伯语和中文选择集上不退化，反之亦然。</li>
+  <li>文本规整器、MeetEval、对齐器、SWAP 统计和 SMR 脚本放只读目录，用校验和锁定。评测器自己要升级时，每次都要在人工标注的锚点集上验证。</li>
+  <li>权重层：伪标签必须来自多个不同视角；每轮都回放原始数据（LoRA 加回放让遗忘减少 55%）；伪标签占比设上限。</li>
+</ul>
+<h3>成本</h3>
+<p><span class="tag t-ours">我们的估计</span> 先缓存、后搜索。约 26 小时阿拉伯语数据用两个模型各跑一遍，按实测速度约 26 × (0.25 + 0.19) ≈ <strong>11.4 GPU 小时</strong>（A6000，transformers；换 vLLM 会少很多）。缓存之后，L0 的几百次阈值试验只在 CPU 上重放。L1 按 Meta-Harness 的规模（约 60 个候选、20 轮）估计是数百 GPU 小时，在 JUBAIL 上用作业数组并行。提议者 agent 的主循环本身也放在 CPU Slurm 作业里，不在登录节点运行。</p>
+</div>
+
+<h2 id="roadmap">路线图与实验</h2>
+<div class="prose"><p>预期收益全部是<span class="tag t-ours">我们的估计</span>，依据写在最后一列。</p></div>
+<div class="tbl"><table class="wide">
+  <thead><tr><th>优先级</th><th>内容与实验</th><th>预期收益</th><th>依据</th></tr></thead>
+  <tbody>
+    <tr><td><b>P0</b></td><td>评测与轨迹底座：锁死的中英阿规整器、MeetEval、SMR、SWAP 统计、真值替换阶梯；两个模型 × 多语种的解码缓存</td><td>无直接收益，决定后面的数字是否可信</td><td>Meta-Harness 轨迹消融；DGM 作弊案例</td></tr>
+    <tr><td><b>P1a</b></td><td>语种安全路由器（规则版）。<b>E1</b>：在 11 个阿拉伯语集、FLEURS 中英、ASCEND，以及人工拼接的阿英中多语会话上扫阈值</td><td>SMR 从 23–82% 降到 &lt;1%；阿拉伯语片段相对"全用 Qwen3"WER 相对降 20–30%</td><td>本项目双模型对比；Qwen3 对话语种识别 94.1%</td></tr>
+    <tr><td><b>P1b</b></td><td>信噪比感知重识别 + SWAP 探针。<b>E2</b>：在重混数据上校准探针；<b>E3</b>：在 LibriCSS 和真实重叠数据上做真值替换阶梯</td><td>重叠句 SWAP 减少 30–60%；LibriCSS 重叠 40% 档 WER 从 19.8% 降到约 13–16%</td><td>本项目：SWAP 占该档错误 64%；5 dB 阈值</td></tr>
+    <tr><td><b>P1c</b></td><td>领域词表检索注入。<b>E4</b>：先测 Audar 的上下文对阿拉伯语术语是否生效</td><td>术语错误相对降 20–40%；整体 WER 相对降 1–5%</td><td>BR-ASR；幻灯片作上下文带来 34–35%</td></tr>
+    <tr><td><b>P2a</b></td><td>L0 联合搜索，含分离阈值，以 tcpWER 为目标。<b>E5</b>：验证"DER 最优 ≠ WER 最优"</td><td>在 P1 基础上再相对降 2–5%</td><td>TS-SEP 反向现象；HINTT 没做阈值消融</td></tr>
+    <tr><td><b>P2b</b></td><td>L1 代码搜索 + 跨语种闸门</td><td>选择集再降 3–8%，测试集约为其一半</td><td>Meta-Harness、HarnessCompass 的搜索/留出差距</td></tr>
+    <tr><td><b>P2c</b></td><td>阿拉伯语说话人分离对比：Audar-Diar、pyannote、DiariZen 及融合。<b>E6</b>：需要少量标注的阿拉伯语多人会话</td><td>未知，先测</td><td>唯一的阿拉伯语 DER 只有 12 个文件</td></tr>
+    <tr><td><b>P3a</b></td><td>学出来的路由器替代规则，约 1–2k 条域内标签</td><td>中间带选择更准，双跑比例下降，成本降 30–50%</td><td>RouteLLM；NVInfo 8B 路由器准确率 96%</td></tr>
+    <tr><td><b>P3b</b></td><td>分离模型伪标签闭环，至多 2 轮</td><td>DER 相对降 10–30%</td><td>多系统伪标签 DER −37.4%；单一来源无增益</td></tr>
+    <tr><td><b>P3c</b></td><td>Qwen3 目标说话人微调：参考音频 + 静音 + 混合音频，加目标缺席的负样本</td><td>远场重叠 SWAP 大幅下降，但难以复现 CocktailASR 的约 16 个点</td><td>CocktailASR 用了约 100 万小时数据和 8B 模型</td></tr>
+  </tbody>
+</table></div>
+<div class="prose">
+<p>先做 P1a 和 P1b，而不是直接上 RSI，因为我们的数据已经给出了两条有因果依据的规则：分错语种几乎损失整句，5 dB 是 SWAP 的阈值。它们不用搜索就能写成代码验证。RSI 的价值在于自动找出阈值、回退顺序，以及在不同语种、不同场地之间都成立的组合。</p>
+<p class="callout warn">马格里布方言（阿尔及利亚、摩洛哥、毛里塔尼亚）上所有模型的 WER 都在 60–130 之间，任何 harness 都解决不了。文献里的上下文解码在方言上也只带来 9% 的相对降幅。这属于数据和模型权重的问题，而且受 Audar 许可证约束，应单独立项。</p>
+</div>
+
+<h2 id="risks">风险：最可能的失败是"指标变好、转写没变好"</h2>
+<div class="tbl"><table class="wide">
+  <thead><tr><th>风险</th><th>表现</th><th>对策</th></tr></thead>
+  <tbody>
+    <tr><td>用删除换 SWAP</td><td>对重叠段干脆输出空，SWAP 降了，内容也没了</td><td>删除率作为硬约束，与 SWAP 一起看</td></tr>
+    <tr><td>用空输出换 SMR</td><td>把可疑片段判为"无语种"，SMR 下降</td><td>SMR 与删除率、覆盖率一起看</td></tr>
+    <tr><td>拼写套利</td><td>改规整器或用 LLM 统一拼写、把方言改成标准阿拉伯语，制造虚假提升</td><td>规整器锁死；同时报 CER；人工抽检方言保留率</td></tr>
+    <tr><td>词表泄漏</td><td>从参考文本里抽词表，或在代码里硬编码句子</td><td>词表只来自议程、幻灯片等独立来源；审计每次改动</td></tr>
+    <tr><td>验证器互相背书</td><td>Qwen3 与 Audar 同源，一致不代表正确</td><td>加入不同结构的第三个模型；在人工锚点集上确认</td></tr>
+    <tr><td>置信度失真</td><td>噪声下置信度虚高；测试时自适应曾把 WER 从 83.61 推到 122.37</td><td>远场条件下不用 token 置信度驱动数据筛选或自适应</td></tr>
+    <tr><td>缺阿拉伯语会议数据</td><td>没有公开的阿拉伯语远场多人会议语料</td><td>重混只能近似，至少自采并标注一小批真实会话做锚点</td></tr>
+    <tr><td>厂商数字不稳定</td><td>Audar 平均 WER 在不同版本里是 24.78 和 23.17；许可证限制商用</td><td>只用自测数字；权重层改造前先确认许可</td></tr>
+    <tr><td>收益饱和</td><td>所有自改进系统几十轮后变平，伪标签收益集中在前 2–3 轮</td><td>把路线图里的数字当作一次性台阶，不指望持续复利</td></tr>
+  </tbody>
+</table></div>
+
+<h2 id="conclusion">结论</h2>
+<div class="prose">
+<p>在"通用模型 + 专用模型"的语音流水线里，harness 的首要职责不是提升平均准确率，而是<strong>管住代价极不对称的灾难性失败</strong>。Audar 的翻译式输出和远场 SWAP 都是流畅、高置信度的文本，只有能看到声学证据的控制器才拦得住。这也是现有单路识别的自改进工作（Voice Memory、纠错提示进化）在这里不够用的原因：它们优化的是"已经说对了是谁、说对了哪种语言"之后的文字。</p>
+<p>由此可以形成一个能投稿的研究框架：<strong>带声学闸门的自改进路由 harness</strong>。它包含三个可以分别验证的命题：</p>
+<ol>
+  <li>语种分流出错在通用/专用模型之间的传播代价，以及由此推出的不对称阈值；</li>
+  <li>信噪比作为路由变量对 SWAP 的因果效果，以及 SWAP 探针的准确度；</li>
+  <li>在锁死的评测器下，阈值、代码、上下文三层搜索的搜索集与留出集差距。</li>
+</ol>
+<p>三个命题都能用现有的 11 个阿拉伯语测试集、FLEURS 和 ASCEND，以及三项重叠实验直接起步。只有阿拉伯语多人会议这一块，需要自己采集并标注一小批数据。</p>
+</div>
+
+<footer>
+  文献数字来自 2026 年 11 月的调研笔记；部分论文只读到摘要，厂商数字已标明。本项目实验数字来自 VoiceMail 仓库的重叠研究（A/B/C）和 NYUAIRLAB-127 服务器上的阿拉伯语基准。完整的 Markdown 报告和调研笔记在仓库的 <code>reports/</code> 与 <code>research_notes/</code> 目录。
+</footer>
+</main>
+</div>
