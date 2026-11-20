@@ -61,13 +61,32 @@ def blocks_for(session, entry, vad):
 
 
 def register_audio(sess):
+    """Merge `sess` into the shared audio index (locked + atomic: parallel shards register concurrently)."""
+    import fcntl
+    import os
+
     index_path = H / "audio_index.json"
-    index = json.loads(index_path.read_text()) if index_path.exists() else {}
-    if any(index.get(k) != v for k, v in sess.items()):
-        index.update(sess)
-        index_path.parent.mkdir(parents=True, exist_ok=True)
-        index_path.write_text(json.dumps(index, indent=0, sort_keys=True))
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(index_path.with_suffix(".lock"), "w") as lk:
+        fcntl.flock(lk, fcntl.LOCK_EX)
+        index = json.loads(index_path.read_text()) if index_path.exists() else {}
+        if any(index.get(k) != v for k, v in sess.items()):
+            index.update(sess)
+            tmp = index_path.with_suffix(f".tmp{os.getpid()}")
+            tmp.write_text(json.dumps(index, indent=0, sort_keys=True))
+            os.replace(tmp, index_path)
     return index_path
+
+
+def select(sess, limit=0, shard=None):
+    """First `limit` sessions (sorted) and/or shard "I/N" (every N-th sorted session from I) for parallel jobs."""
+    names = sorted(sess)
+    if limit:
+        names = names[:limit]
+    if shard:
+        i, n = (int(x) for x in shard.split("/"))
+        names = names[i::n]
+    return {k: sess[k] for k in names}
 
 
 def run_sessions(cfg, sess, out, cost=None, diar=H / "diar/nemotron3_low", cache_dir=H / "cache", context=None,
@@ -118,11 +137,12 @@ def main():
     ap.add_argument("--candidate-params", default=None, help="JSON object of the candidate's parameters")
     ap.add_argument("--out", required=True)
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--shard", default=None, help="I/N: this job's share of the sessions (parallel cache fill)")
     a = ap.parse_args()
-    sess = sessions_of(a.manifest, a.split, a.splits)
-    if a.limit:
-        sess = dict(sorted(sess.items())[:a.limit])
+    sess = select(sessions_of(a.manifest, a.split, a.splits), a.limit, a.shard)
     register_audio(sess)
+    Path(a.out).mkdir(parents=True, exist_ok=True)
+    (Path(a.out) / "_sessions.txt").write_text("".join(f"{k}\n" for k in sess))  # for fill --sessions-file
     missing = run_sessions(config.load(a.config), sess, a.out, CostModel.load(a.cost) if a.cost else None, a.diar,
                            a.cache, a.context, a.forced_language, a.candidate,
                            json.loads(a.candidate_params) if a.candidate_params else None)

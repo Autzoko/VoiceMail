@@ -76,7 +76,8 @@ class Engine:
         att = torch.ones_like(ids)
         out = self.model.generate(input_ids=ids, attention_mask=att, input_features=inputs["input_features"],
                                   feature_attention_mask=inputs["feature_attention_mask"],
-                                  max_new_tokens=MAX_NEW, do_sample=False)
+                                  max_new_tokens=MAX_NEW, do_sample=False,
+                                  pad_token_id=self.tok.eos_token_id)  # = the default; silences a per-call warning
         seq = out.sequences[0, ids.shape[1]:]
         text = self.tok.decode(seq, skip_special_tokens=True, clean_up_tokenization_spaces=False)
         if ASR_TEXT in text:
@@ -108,11 +109,18 @@ class Engine:
             return self._generate(inputs, ids2), chosen, probs
 
 
-def pending(cache, engine):
-    """{session: {(engine, q0, q1, ctx)}} of misses not yet in the cache."""
-    todo = defaultdict(set)
+def _miss_files(cache, sessions=None):
     for mf in sorted(Path(cache).glob("*.misses.jsonl")):
         session = mf.name[:-len(".misses.jsonl")]
+        if sessions is None or session in sessions:
+            yield session, mf
+
+
+def pending(cache, engine, sessions=None):
+    """{session: {(engine, q0, q1, ctx)}} of misses not yet in the cache (only `sessions` if given: parallel jobs
+    must each own disjoint sessions, since a session's cache and misses files are not locked)."""
+    todo = defaultdict(set)
+    for session, mf in _miss_files(cache, sessions):
         have = set()
         cf = Path(cache) / f"{session}.jsonl"
         if cf.exists():
@@ -127,11 +135,11 @@ def pending(cache, engine):
     return todo
 
 
-def fill(eng, cache, index, contexts=None, quiet=False):
-    """Decode every pending miss of `eng.engine`; returns the number of spans decoded."""
+def fill(eng, cache, index, contexts=None, quiet=False, sessions=None):
+    """Decode every pending miss of `eng.engine` (of `sessions` if given); returns the number of spans decoded."""
     cache = Path(cache)
     contexts = {"": "", **(contexts or {})}
-    todo = pending(cache, eng.engine)
+    todo = pending(cache, eng.engine, sessions)
     total = sum(len(v) for v in todo.values())
     t0, done, audio_s = time.time(), 0, 0.0
     for session, keys in sorted(todo.items()):
@@ -148,7 +156,7 @@ def fill(eng, cache, index, contexts=None, quiet=False):
         if not quiet:
             print(f"  {session}: {len(keys)} spans; total {done}/{total}, "
                   f"RTF {(time.time() - t0) / max(audio_s, 1e-9):.3f}", flush=True)
-    for mf in cache.glob("*.misses.jsonl"):  # every miss of this engine is filled now
+    for _, mf in list(_miss_files(cache, sessions)):  # every miss of this engine is filled now
         rest = [l for l in open(mf) if json.loads(l)["engine"] != eng.engine]
         mf.write_text("".join(rest)) if rest else mf.unlink()
     return done
@@ -161,14 +169,16 @@ def main():
     ap.add_argument("--cache", required=True)
     ap.add_argument("--audio-index", required=True, help="JSON {session: {audio, channel}}")
     ap.add_argument("--contexts", help="JSON {ctx key: context text}; default only the empty context")
+    ap.add_argument("--sessions-file", help="only these sessions (one per line; simulate --shard writes it)")
     a = ap.parse_args()
-    todo = pending(a.cache, a.engine)
+    sessions = set(Path(a.sessions_file).read_text().split()) if a.sessions_file else None
+    todo = pending(a.cache, a.engine, sessions)
     print(f"{a.engine}: {sum(len(v) for v in todo.values())} spans in {len(todo)} sessions", flush=True)
     if not todo:
         return
     index = json.loads(Path(a.audio_index).read_text())
     contexts = json.loads(Path(a.contexts).read_text()) if a.contexts else None
-    fill(Engine(a.checkpoint, a.engine), a.cache, index, contexts)
+    fill(Engine(a.checkpoint, a.engine), a.cache, index, contexts, sessions=sessions)
 
 
 if __name__ == "__main__":
