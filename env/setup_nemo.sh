@@ -18,6 +18,11 @@ echo "torch==2.9.1+cu128" > env/nemo-constraints.txt
 TORCH_IDX="--extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match"
 uv pip install $TORCH_IDX -c env/nemo-constraints.txt torch==2.9.1+cu128
 uv pip install $TORCH_IDX -c env/nemo-constraints.txt 'nemo-toolkit[asr]' soundfile pyannote.metrics pandas
+# Nemotron-3-Diarization's encoder uses RoPE (self_attention_model='rope'); PyPI nemo-toolkit 3.0.0 rejects it
+# (job 19475726), so NeMo comes from git main (NEMO_REF to pin a commit)
+uv pip install $TORCH_IDX -c env/nemo-constraints.txt "nemo-toolkit[asr] @ git+https://github.com/NVIDIA/NeMo.git@${NEMO_REF:-main}"
+grep -q "rope" $VIRTUAL_ENV/lib/python3.12/site-packages/nemo/collections/asr/modules/transformer_encoder.py \
+  || { echo "NeMo at ${NEMO_REF:-main} still lacks RoPE in TransformerEncoder"; exit 3; }
 python - <<'PY'
 import nemo, torch
 from nemo.collections.asr.models import SortformerEncLabelModel  # noqa: F401
