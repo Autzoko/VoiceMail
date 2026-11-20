@@ -108,24 +108,13 @@ class Engine:
             return self._generate(inputs, ids2), chosen, probs
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--engine", required=True, choices=["qwen", "audar"])
-    ap.add_argument("--checkpoint", required=True)
-    ap.add_argument("--cache", required=True)
-    ap.add_argument("--audio-index", required=True, help="JSON {session: {audio, channel}}")
-    ap.add_argument("--contexts", help="JSON {ctx key: context text}; default only the empty context")
-    a = ap.parse_args()
-    cache = Path(a.cache)
-    index = json.loads(Path(a.audio_index).read_text())
-    contexts = {"": ""}
-    if a.contexts:
-        contexts.update(json.loads(Path(a.contexts).read_text()))
+def pending(cache, engine):
+    """{session: {(engine, q0, q1, ctx)}} of misses not yet in the cache."""
     todo = defaultdict(set)
-    for mf in sorted(cache.glob("*.misses.jsonl")):
+    for mf in sorted(Path(cache).glob("*.misses.jsonl")):
         session = mf.name[:-len(".misses.jsonl")]
         have = set()
-        cf = cache / f"{session}.jsonl"
+        cf = Path(cache) / f"{session}.jsonl"
         if cf.exists():
             for line in open(cf, encoding="utf-8"):
                 e = json.loads(line)
@@ -133,13 +122,17 @@ def main():
         for line in open(mf):
             m = json.loads(line)
             key = (m["engine"], m["q0"], m["q1"], m.get("ctx", ""))
-            if m["engine"] == a.engine and key not in have:
+            if m["engine"] == engine and key not in have:
                 todo[session].add(key)
+    return todo
+
+
+def fill(eng, cache, index, contexts=None, quiet=False):
+    """Decode every pending miss of `eng.engine`; returns the number of spans decoded."""
+    cache = Path(cache)
+    contexts = {"": "", **(contexts or {})}
+    todo = pending(cache, eng.engine)
     total = sum(len(v) for v in todo.values())
-    print(f"{a.engine}: {total} spans in {len(todo)} sessions", flush=True)
-    if not total:
-        return
-    eng = Engine(a.checkpoint, a.engine)
     t0, done, audio_s = time.time(), 0, 0.0
     for session, keys in sorted(todo.items()):
         x = load_audio(index[session])
@@ -152,12 +145,30 @@ def main():
                                     "language": lang, "probs": probs}, ensure_ascii=False) + "\n")
                 done += 1
                 audio_s += (q1 - q0) * Q / 16000
-            f.flush()
-        print(f"  {session}: {len(keys)} spans; total {done}/{total}, RTF {(time.time() - t0) / max(audio_s, 1e-9):.3f}",
-              flush=True)
+        if not quiet:
+            print(f"  {session}: {len(keys)} spans; total {done}/{total}, "
+                  f"RTF {(time.time() - t0) / max(audio_s, 1e-9):.3f}", flush=True)
     for mf in cache.glob("*.misses.jsonl"):  # every miss of this engine is filled now
-        rest = [l for l in open(mf) if json.loads(l)["engine"] != a.engine]
+        rest = [l for l in open(mf) if json.loads(l)["engine"] != eng.engine]
         mf.write_text("".join(rest)) if rest else mf.unlink()
+    return done
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--engine", required=True, choices=["qwen", "audar"])
+    ap.add_argument("--checkpoint", required=True)
+    ap.add_argument("--cache", required=True)
+    ap.add_argument("--audio-index", required=True, help="JSON {session: {audio, channel}}")
+    ap.add_argument("--contexts", help="JSON {ctx key: context text}; default only the empty context")
+    a = ap.parse_args()
+    todo = pending(a.cache, a.engine)
+    print(f"{a.engine}: {sum(len(v) for v in todo.values())} spans in {len(todo)} sessions", flush=True)
+    if not todo:
+        return
+    index = json.loads(Path(a.audio_index).read_text())
+    contexts = json.loads(Path(a.contexts).read_text()) if a.contexts else None
+    fill(Engine(a.checkpoint, a.engine), a.cache, index, contexts)
 
 
 if __name__ == "__main__":

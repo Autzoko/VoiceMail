@@ -60,6 +60,48 @@ def blocks_for(session, entry, vad):
     return [((i + 1) * BLOCK, bool(f)) for i, f in enumerate(flags)], len(flags) * BLOCK / 16000
 
 
+def register_audio(sess):
+    index_path = H / "audio_index.json"
+    index = json.loads(index_path.read_text()) if index_path.exists() else {}
+    if any(index.get(k) != v for k, v in sess.items()):
+        index.update(sess)
+        index_path.parent.mkdir(parents=True, exist_ok=True)
+        index_path.write_text(json.dumps(index, indent=0, sort_keys=True))
+    return index_path
+
+
+def run_sessions(cfg, sess, out, cost=None, diar=H / "diar/nemotron3_low", cache_dir=H / "cache", context=None,
+                 forced_language=None, candidate=None, candidate_params=None, quiet=False):
+    """Simulate every session of `sess` ({session: audio entry}) with config `cfg`; write hypotheses to `out`.
+    Returns the number of decodes that were missing from the cache (0 = the run is complete)."""
+    cost = cost or CostModel()
+    out = Path(out)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "_config.json").write_text(config.dump(cfg) + "\n")
+    (out / "_candidate.json").write_text(json.dumps({"candidate": candidate, "params": candidate_params}) + "\n")
+    missing = 0
+    for session, entry in sorted(sess.items()):
+        blocks, duration = blocks_for(session, entry, cfg["vad"])
+        dp = Path(diar) / f"{session}.npy"
+        obs = observations(np.load(dp).astype(np.float32)) if dp.exists() else []
+        cache = DecodeCache(cache_dir, session, context)
+        router = None
+        if candidate == "session_language":
+            from .candidates.session_language import SessionLanguageRouter
+
+            router = SessionLanguageRouter(cfg["router"], cache, forced_language, candidate_params)
+        hyp = Twin(cfg, cache, cost, forced_language, router).run(blocks, obs, duration)
+        n = cache.write_misses()
+        missing += n
+        hyp["session"] = session
+        hyp["incomplete"] = n
+        (out / f"{session}.json").write_text(json.dumps(hyp, ensure_ascii=False))
+        if not quiet:
+            print(f"{session}: {len(hyp['lines'])} lines, {len(hyp['captions'])} passes, {n} decodes missing"
+                  f"{'' if dp.exists() else ', NO DIARIZATION'}", flush=True)
+    return missing
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--manifest", nargs="+", required=True)
@@ -77,40 +119,13 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--limit", type=int, default=0)
     a = ap.parse_args()
-    cfg = config.load(a.config)
-    cost = CostModel.load(a.cost) if a.cost else CostModel()
     sess = sessions_of(a.manifest, a.split, a.splits)
     if a.limit:
         sess = dict(sorted(sess.items())[:a.limit])
-    index_path = H / "audio_index.json"
-    index = json.loads(index_path.read_text()) if index_path.exists() else {}
-    index.update(sess)
-    index_path.parent.mkdir(parents=True, exist_ok=True)
-    index_path.write_text(json.dumps(index, indent=0, sort_keys=True))
-    out = Path(a.out)
-    out.mkdir(parents=True, exist_ok=True)
-    (out / "_config.json").write_text(config.dump(cfg) + "\n")
-    (out / "_candidate.json").write_text(json.dumps({"candidate": a.candidate, "params": a.candidate_params}) + "\n")
-    missing = 0
-    for session, entry in sorted(sess.items()):
-        blocks, duration = blocks_for(session, entry, cfg["vad"])
-        dp = Path(a.diar) / f"{session}.npy"
-        obs = observations(np.load(dp).astype(np.float32)) if dp.exists() else []
-        cache = DecodeCache(a.cache, session, a.context)
-        router = None
-        if a.candidate == "session_language":
-            from .candidates.session_language import SessionLanguageRouter
-
-            router = SessionLanguageRouter(cfg["router"], cache, a.forced_language,
-                                           json.loads(a.candidate_params) if a.candidate_params else None)
-        hyp = Twin(cfg, cache, cost, a.forced_language, router).run(blocks, obs, duration)
-        n = cache.write_misses()
-        missing += n
-        hyp["session"] = session
-        hyp["incomplete"] = n
-        (out / f"{session}.json").write_text(json.dumps(hyp, ensure_ascii=False))
-        print(f"{session}: {len(hyp['lines'])} lines, {len(hyp['captions'])} passes, {n} decodes missing"
-              f"{'' if dp.exists() else ', NO DIARIZATION'}", flush=True)
+    register_audio(sess)
+    missing = run_sessions(config.load(a.config), sess, a.out, CostModel.load(a.cost) if a.cost else None, a.diar,
+                           a.cache, a.context, a.forced_language, a.candidate,
+                           json.loads(a.candidate_params) if a.candidate_params else None)
     print(f"missing decodes: {missing}")
     sys.exit(3 if missing else 0)
 
