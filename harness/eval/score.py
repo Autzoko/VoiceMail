@@ -44,9 +44,11 @@ def main(argv=None):
     ap.add_argument("--split", required=True, choices=["search", "select", "test", "anchor"])
     ap.add_argument("--splits", default=str(SPLITS))
     ap.add_argument("--out", required=True)
+    ap.add_argument("--only-hyp", action="store_true",
+                    help="debug: score only sessions that have a hypothesis (result is never official)")
     a = ap.parse_args(argv)
 
-    official = lock.check(quiet=False)
+    official = lock.check(quiet=False) and not a.only_hyp
     refs = load_references(a.ref)
     if a.split != "anchor":  # the anchor set (macmini only) is its own split: all of its sessions count
         splits = json.loads(Path(a.splits).read_text())["splits"]
@@ -54,6 +56,8 @@ def main(argv=None):
     if not refs:
         raise SystemExit(f"no reference session of split {a.split!r} in {a.ref}")
     hyps = load_hypotheses(a.hyp)
+    if a.only_hyp:
+        refs = {s: r for s, r in refs.items() if s in hyps}
     extra = sorted(set(hyps) - set(refs))
     rows = [session_counts(s, refs[s], hyps.get(s)) for s in sorted(refs)]
     out = Path(a.out)

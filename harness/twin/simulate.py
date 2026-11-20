@@ -84,7 +84,7 @@ def main():
     index_path.write_text(json.dumps(index, indent=0, sort_keys=True))
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    (out / "config.json").write_text(config.dump(cfg) + "\n")
+    (out / "_config.json").write_text(config.dump(cfg) + "\n")
     missing = 0
     for session, entry in sorted(sess.items()):
         blocks, duration = blocks_for(session, entry)

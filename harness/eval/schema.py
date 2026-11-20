@@ -58,7 +58,7 @@ def load_hypothesis(path) -> dict:
 
 def load_hypotheses(directory) -> dict:
     out = {}
-    for p in sorted(Path(directory).glob("*.json")):
+    for p in sorted(Path(directory).glob("[!_]*.json")):  # "_config.json" etc. are run metadata
         h = load_hypothesis(p)
         if h["session"] in out:
             raise SchemaError(f"session {h['session']} appears twice in {directory}")
