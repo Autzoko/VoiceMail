@@ -1,5 +1,7 @@
 # Source on JUBAIL:  . env/activate.sh
 # Python 3.12 venv (uv) at env/venv; caches on /scratch (home quota is tiny).
+# meeteval / sherpa-onnx extensions need GLIBCXX_3.4.29: the system libstdc++ (CentOS 8) is too old
+type module >/dev/null 2>&1 && module load gcc/12.2.0 2>/dev/null || true
 _VM_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 export PATH=$HOME/.local/bin:$_VM_ROOT/env/venv/bin:$PATH
 export VIRTUAL_ENV=$_VM_ROOT/env/venv

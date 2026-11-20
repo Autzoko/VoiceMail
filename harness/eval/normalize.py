@@ -15,7 +15,7 @@ from src.utils.text_norm import normalize_en, normalize_zh
 
 # ---- Arabic N1 (verbatim from the benchmark) ----
 _AR_TAGS = re.compile(r"\[[^\]]*\]|<[^>]*>|#\s*غير[\s_-]*واضح")
-_HARAKAT = re.compile(r"[ً-ْٓ-ٰٟـۖ-ۭ]")
+_HARAKAT = re.compile("[\u064B-\u0652\u0653-\u065F\u0670\u0640\u06D6-\u06ED]")  # escaped: bidi-safe
 _AR_MAP = str.maketrans({"پ": "ب", "ڤ": "ف", "آ": "ا", "أ": "ا", "إ": "ا", "ٱ": "ا", "ؤ": "و", "ئ": "ي",
                          **{chr(0x0660 + i): str(i) for i in range(10)},
                          **{chr(0x06F0 + i): str(i) for i in range(10)}})
