@@ -11,8 +11,14 @@ import numpy as np
 
 SR = 16000
 BLOCK = 512
-VAD = {"threshold": 0.5, "min_silence_duration": 0.35, "min_speech_duration": 0.25, "window_size": 512,
-       "max_speech_duration": 20.0}
+
+
+def vad_settings(vad):
+    """HarnessConfig.vad -> sherpa-onnx SileroVadModelConfig fields (window 512 fixed, as in VoiceNative.c)."""
+    return {"threshold": vad["threshold"], "min_silence_duration": vad["minSilence"],
+            "min_speech_duration": vad["minSpeech"], "window_size": 512, "max_speech_duration": vad["maxSpeech"]}
+
+
 RESET_SAMPLES = 128000  # the detector is reset between utterances after this many samples
 
 
@@ -31,13 +37,13 @@ def high_pass(audio, f=150.0, rate=16000.0):
     return sosfilt(np.array(sos), np.asarray(audio, np.float64)).astype(np.float32)
 
 
-def vad_blocks(audio, vad_model):
-    """audio: float32 mono 16 kHz. Returns list of (end_sample, speech)."""
+def vad_blocks(audio, vad_model, vad):
+    """audio: float32 mono 16 kHz; vad: HarnessConfig.vad. Returns list of (end_sample, speech)."""
     import sherpa_onnx
 
     cfg = sherpa_onnx.VadModelConfig()
     cfg.silero_vad.model = vad_model
-    for k, v in VAD.items():
+    for k, v in vad_settings(vad).items():
         setattr(cfg.silero_vad, k, v)
     cfg.sample_rate = SR
     det = sherpa_onnx.VoiceActivityDetector(cfg, buffer_size_in_seconds=30)

@@ -21,5 +21,6 @@
   },
   "activity": { "on": 0.5, "off": 0.35, "confirm": 0.6, "hold": 0.24 },
   "voices": { "accept": 0.55, "keep": 0.42, "learn": 0.65 },
+  "vad": { "threshold": 0.5, "minSilence": 0.35, "minSpeech": 0.25, "maxSpeech": 20.0 },
   "translation": { "contextSentences": 2 }
 }

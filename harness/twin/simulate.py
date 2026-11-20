@@ -4,7 +4,7 @@
         --config harness/twin/default.json --out data/outputs/harness/runs/<name>
 
 Per session it needs (all on JUBAIL, under data/outputs/harness/):
-  vad/<session>.npy                   speech flag per 512-sample block (made here on first use; Silero via sherpa-onnx)
+  vad/<settings>/<session>.npy                  speech flag per 512-sample block (made here on first use; Silero via sherpa-onnx)
   diar/nemotron3_low/<session>.npy    Nemotron frame probabilities (harness/diar, preset low); absent = no speakers
   cache/<session>.jsonl               decodes (harness/twin/fill.py); spans not cached are listed in
                                       cache/<session>.misses.jsonl and the run is reported incomplete
@@ -12,6 +12,7 @@ Exit status 3 when any decode was missing (fill, then run again: the spans only 
 routing, so this converges in a few rounds).
 """
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -45,14 +46,15 @@ def sessions_of(manifests, split, splits_file):
     return out
 
 
-def blocks_for(session, entry):
-    p = H / "vad" / f"{session}.npy"
+def blocks_for(session, entry, vad):
+    key = hashlib.sha1(json.dumps(vad, sort_keys=True).encode()).hexdigest()[:8]  # VAD output depends on its settings
+    p = H / "vad" / key / f"{session}.npy"
     if p.exists():
         flags = np.load(p)
     else:
         from .fill import load_audio
 
-        flags = np.array([s for _, s in vad_blocks(load_audio(entry), str(VAD_MODEL))], bool)
+        flags = np.array([s for _, s in vad_blocks(load_audio(entry), str(VAD_MODEL), vad)], bool)
         p.parent.mkdir(parents=True, exist_ok=True)
         np.save(p, flags)
     return [((i + 1) * BLOCK, bool(f)) for i, f in enumerate(flags)], len(flags) * BLOCK / 16000
@@ -91,7 +93,7 @@ def main():
     (out / "_candidate.json").write_text(json.dumps({"candidate": a.candidate, "params": a.candidate_params}) + "\n")
     missing = 0
     for session, entry in sorted(sess.items()):
-        blocks, duration = blocks_for(session, entry)
+        blocks, duration = blocks_for(session, entry, cfg["vad"])
         dp = Path(a.diar) / f"{session}.npy"
         obs = observations(np.load(dp).astype(np.float32)) if dp.exists() else []
         cache = DecodeCache(a.cache, session, a.context)
