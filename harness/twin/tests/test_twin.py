@@ -164,3 +164,29 @@ def test_cache_roundtrip_through_twin(tmp_path=None):
     h = Twin(config.DEFAULTS, c2, CostModel()).run(_blocks([(1.0, 3.0)], 4.0), [], 4.0)
     assert not c2.misses and h["captions"][-1]["text"] == "hi there"
     assert quantize((1601, 3250)) == (1, 2)
+
+
+def test_session_language_locks_arabic_and_skips_qwen():
+    from harness.twin.candidates.session_language import SessionLanguageRouter
+
+    b = Fake(p_ar=0.97)
+    r = SessionLanguageRouter(config.DEFAULTS["router"], b, params={"lockAt": 4.0, "probeEvery": 100})
+    for u in range(1, 4):
+        r.decode(u, False, None, (0, 16000))
+        r.decode(u, True, None, (0, 32000))
+    assert r.locked == "ar"
+    b.calls.clear()
+    res, passes, tr = r.decode(9, False, None, (0, 16000))
+    assert [e for e, _ in passes] == ["audar"] and res.language == "ar" and tr["session"] == "locked-ar"
+
+
+def test_session_language_does_not_lock_english_to_arabic():
+    from harness.twin.candidates.session_language import SessionLanguageRouter
+
+    r = SessionLanguageRouter(config.DEFAULTS["router"], Fake(p_ar=0.001))
+    for u in range(1, 6):
+        r.decode(u, False, None, (0, 16000 * 4))
+        r.decode(u, True, None, (0, 16000 * 4))
+    assert r.locked == "other" and r.L < 0
+    _, passes, _ = r.decode(9, True, None, (0, 16000))
+    assert [e for e, _ in passes] == ["qwen"]

@@ -56,7 +56,7 @@ class Job:
 
 
 class Twin:
-    def __init__(self, cfg, backend, cost=None, forced_language=None):
+    def __init__(self, cfg, backend, cost=None, forced_language=None, router=None):
         self.cfg = cfg
         tc = cfg["transcription"]
         self.partial_interval = tc["partialInterval"] if tc["partialInterval"] is not None else ENGINE[
@@ -66,7 +66,7 @@ class Twin:
         self.cost_factor = tc["partialCostFactor"]
         self.backend = backend
         self.cost = cost or CostModel()
-        self.router = Router(cfg["router"], backend, forced_language)
+        self.router = router or Router(cfg["router"], backend, forced_language)
         # capture-side state
         self.in_speech = False
         self.segment = 0

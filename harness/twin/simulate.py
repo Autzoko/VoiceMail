@@ -69,6 +69,9 @@ def main():
     ap.add_argument("--cache", default=str(H / "cache"))
     ap.add_argument("--context", default=None)
     ap.add_argument("--forced-language", default=None, choices=["zh", "en", "ar"])
+    ap.add_argument("--candidate", default=None, choices=["session_language"],
+                    help="twin-only L1 candidate router (harness/twin/candidates)")
+    ap.add_argument("--candidate-params", default=None, help="JSON object of the candidate's parameters")
     ap.add_argument("--out", required=True)
     ap.add_argument("--limit", type=int, default=0)
     a = ap.parse_args()
@@ -85,13 +88,20 @@ def main():
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     (out / "_config.json").write_text(config.dump(cfg) + "\n")
+    (out / "_candidate.json").write_text(json.dumps({"candidate": a.candidate, "params": a.candidate_params}) + "\n")
     missing = 0
     for session, entry in sorted(sess.items()):
         blocks, duration = blocks_for(session, entry)
         dp = Path(a.diar) / f"{session}.npy"
         obs = observations(np.load(dp).astype(np.float32)) if dp.exists() else []
         cache = DecodeCache(a.cache, session, a.context)
-        hyp = Twin(cfg, cache, cost, a.forced_language).run(blocks, obs, duration)
+        router = None
+        if a.candidate == "session_language":
+            from .candidates.session_language import SessionLanguageRouter
+
+            router = SessionLanguageRouter(cfg["router"], cache, a.forced_language,
+                                           json.loads(a.candidate_params) if a.candidate_params else None)
+        hyp = Twin(cfg, cache, cost, a.forced_language, router).run(blocks, obs, duration)
         n = cache.write_misses()
         missing += n
         hyp["session"] = session
