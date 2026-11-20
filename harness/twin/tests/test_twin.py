@@ -190,3 +190,30 @@ def test_session_language_does_not_lock_english_to_arabic():
     assert r.locked == "other" and r.L < 0
     _, passes, _ = r.decode(9, True, None, (0, 16000))
     assert [e for e, _ in passes] == ["qwen"]
+
+
+def test_from_vocali_ndjson():
+    import tempfile
+
+    from harness.twin.from_vocali import convert
+
+    t0 = 1000.0
+    rows = [{"_t": t0, "replay": {"event": "start", "audioSeconds": "6.0", "speed": "1"}},
+            {"_t": t0 + 1.2, "activity": {"start": t0, "step": 0.08, "probs": [[90, 0]] * 40 + [[0, 90]] * 35}},
+            {"_t": t0 + 2.0, "transcript": {"utterance": 1, "segment": 1, "start": t0 + 0.5, "end": t0 + 2.0,
+                                            "final": False, "language": "en", "processingMS": 1,
+                                            "tokens": [{"start": t0 + 0.6, "end": t0 + 1.0, "bytes": list(b"hi ")}]}},
+            {"_t": t0 + 6.5, "transcript": {"utterance": 1, "segment": 1, "start": t0 + 0.5, "end": t0 + 5.5,
+                                            "final": True, "language": "en", "processingMS": 1, "tokens": [
+                                                {"start": t0 + 0.6, "end": t0 + 1.0, "bytes": list(b"hi ")},
+                                                {"start": t0 + 1.0, "end": t0 + 2.0, "bytes": list(b"there ")},
+                                                {"start": t0 + 3.5, "end": t0 + 4.5, "bytes": list(b"good ")},
+                                                {"start": t0 + 4.5, "end": t0 + 5.4, "bytes": list(b"bye")}]}},
+            {"_t": t0 + 6.5, "route": {"utterance": 1, "final": True, "seconds": 5.0, "engine": "qwen",
+                                       "switched": False}}]
+    d = Path(tempfile.mkdtemp())
+    (d / "x.ndjson").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    h = convert(d / "x.ndjson", "x")
+    assert [l["speaker"] for l in h["lines"]] == ["1", "2"] and h["lines"][1]["text"] == "good bye"
+    assert h["captions"][0]["t"] == pytest.approx(2.0) and h["utterances"]["1"] == [0.5, 5.5]
+    assert h["cost"]["decode_audio_seconds"] == 5.0 and h["duration"] == 6.0
