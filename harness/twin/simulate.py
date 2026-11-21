@@ -102,7 +102,7 @@ def run_sessions(cfg, sess, out, cost=None, diar=H / "diar/nemotron3_low", cache
     for session, entry in sorted(sess.items()):
         blocks, duration = blocks_for(session, entry, cfg["vad"])
         dp = Path(diar) / f"{session}.npy"
-        obs = observations(np.load(dp).astype(np.float32)) if dp.exists() else []
+        obs = observations(np.load(dp), frame=0.01) if dp.exists() else []  # 10 ms frames -> 80 ms rows
         cache = DecodeCache(cache_dir, session, context)
         router = None
         if candidate == "session_language":

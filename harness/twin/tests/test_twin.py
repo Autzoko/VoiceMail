@@ -217,3 +217,13 @@ def test_from_vocali_ndjson():
     assert [l["speaker"] for l in h["lines"]] == ["1", "2"] and h["lines"][1]["text"] == "good bye"
     assert h["captions"][0]["t"] == pytest.approx(2.0) and h["utterances"]["1"] == [0.5, 5.5]
     assert h["cost"]["decode_audio_seconds"] == 5.0 and h["duration"] == 6.0
+
+
+def test_observations_average_10ms_frames_like_nemotron_stream():
+    hi = np.zeros((72 * 2 + 16, 2), np.float32)  # two full chunks + a partial one (2 rows)
+    hi[:8, 0] = [0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0]   # mean 0.5 -> 50
+    hi[8:16, 0] = 0.00625                                   # mean 0.625 % -> rounds half up to 1
+    obs = observations(hi[None], frame=0.01)
+    assert [len(o.probs) for o in obs] == [9, 9, 2]
+    assert obs[0].probs[0, 0] == 50 and obs[0].probs[1, 0] == 1
+    assert obs[1].start == pytest.approx(0.72) and obs[0].arrival == pytest.approx(0.72 + 0.32 + 0.05)

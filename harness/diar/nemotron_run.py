@@ -4,7 +4,7 @@ the speaker-probability input of the twin (harness/twin/diar.py).
     python harness/diar/nemotron_run.py --manifest m1.jsonl m2.jsonl --split search select [--shard 0/4]
 
 Per session (channel `channel` of the manifest audio = the single far-field mic):
-  data/outputs/harness/diar/nemotron3_<preset>/<session>.npy   frame probabilities (float16, T x speakers)
+  data/outputs/harness/diar/nemotron3_<preset>/<session>.npy   10 ms frame probabilities (float32, T x speakers)
                                                                <session>.rttm, <session>.json (DER, RTF, counts)
 Sessions whose .npy exists are skipped (resumable; parallel shards own disjoint sessions).
 """
@@ -103,7 +103,7 @@ def main():
                     der_c0=round(DiarizationErrorRate(collar=0.0)(ref, hyp), 4),
                     der_c025=round(DiarizationErrorRate(collar=0.25)(ref, hyp), 4))
         (out / f"{name}.json").write_text(json.dumps(info))
-        np.save(out / f"{name}.npy", p.astype(np.float16))  # last: its presence marks the session done
+        np.save(out / f"{name}.npy", p.astype(np.float32))  # last: its presence marks the session done
         print(info, flush=True)
 
 

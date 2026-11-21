@@ -3,7 +3,8 @@
     TurnSplitter     Sources/VocaliEngine/EngineOutput.swift   (speaker reports and cuts for the Transcriber)
     decision log     Sources/VocaliKit/Model/AppModel.swift consumeActivity (per-frame decisions, corrected back
                      by `hold` when someone takes over)
-Input: Nemotron-3-Diarization frame probabilities (T x S, 0..1, 80 ms frames) from harness/diar.
+Input: Nemotron-3-Diarization frame probabilities (T x S, 0..1, 10 ms frames) from harness/diar, averaged to
+80 ms rows exactly as NemotronStream.publish does.
 Arrival times model NemotronStream: frames come in chunks of `chunk` frames, published `lookahead + compute`
 seconds after the chunk's last frame ends (preset low: 9 frames = 0.72 s, look-ahead 0.32 s).
 """
@@ -24,12 +25,23 @@ class Observation:
     arrival: float
 
 
-def observations(probs, chunk=9, lookahead=0.32, compute=0.05, step=STEP):
-    pct = np.clip(np.rint(np.asarray(probs, np.float64) * 100), 0, 100).astype(np.uint8)
+def observations(probs, chunk=9, lookahead=0.32, compute=0.05, step=STEP, frame=STEP):
+    """probs: T x S at `frame` seconds (Nemotron-3 high-resolution output is 10 ms; NeMo and FluidAudio alike).
+    As NemotronStream.publish: each published chunk (`chunk` rows of `step`) averages groups of step/frame frames
+    in Float32 and rounds to whole percent half away from zero (Swift .rounded())."""
+    group = int(round(step / frame))
+    x = np.asarray(probs, np.float32)
+    x = x.reshape(x.shape[-2], x.shape[-1]) if x.ndim == 3 else x
     out = []
-    for i in range(0, len(pct), chunk):
-        rows = pct[i:i + chunk]
-        start = i * step
+    per = chunk * group
+    for i in range(0, len(x), per):
+        block = x[i:i + per]
+        rows = []
+        for f in range(0, len(block), group):
+            m = block[f:f + group].sum(axis=0, dtype=np.float32) / np.float32(len(block[f:f + group]))
+            rows.append(np.clip(np.floor(m * np.float32(100) + np.float32(0.5)), 0, 100))
+        rows = np.array(rows, np.uint8)
+        start = i * frame
         end = start + len(rows) * step
         out.append(Observation(start, step, rows, end + lookahead + compute))
     return out
