@@ -24,7 +24,7 @@ fi
 echo "host=$(hostname) commit=$(git rev-parse --short HEAD) man=$MAN split=$SPLIT limit=$LIMIT start=$(date -Is)"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 [ -f harness/splits.json ] || python harness/make_splits.py
-for round in 1 2 3 4 5 6; do
+for round in $(seq 1 ${ROUNDS:-10}); do
   echo "== round $round $(date -Is)"
   python -m harness.twin.simulate --manifest $MAN --split $SPLIT --limit $LIMIT "${SHARD[@]}" --out $OUT; rc=$?
   [ $rc -eq 0 ] && break
@@ -34,6 +34,6 @@ for round in 1 2 3 4 5 6; do
   python -m harness.twin.fill --engine audar --checkpoint data/checkpoints/Audar-ASR-V1-Turbo --cache $CACHE \
       --audio-index data/outputs/harness/audio_index.json "${FILLSEL[@]}" || exit 1
 done
-[ $rc -ne 0 ] && { echo "decodes still missing after 6 rounds"; exit 1; }
+[ $rc -ne 0 ] && { echo "decodes still missing after ${ROUNDS:-10} rounds"; exit 1; }
 [ "$SCORE" = 1 ] && python -m harness.eval.score --hyp $OUT --ref $MAN --split $SPLIT --only-hyp --out $OUT/score
 echo "end=$(date -Is)"
