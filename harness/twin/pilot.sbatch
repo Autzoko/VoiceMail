@@ -3,7 +3,8 @@
 # missing, then score (debug scoring: only these sessions, never official).
 #   MAN=data/datasets/manifests/libricss__sdm.jsonl SPLIT=search LIMIT=3 NAME=pilot_libricss sbatch harness/twin/pilot.sbatch
 # Defaults are MAN=libricss LIMIT=3: a full run must set MAN, SPLIT and LIMIT=0. DIAR=<dir> replays another
-# diarization (e.g. data/outputs/harness/diar/oracle for the M1 ladder).
+# diarization (e.g. data/outputs/harness/diar/oracle for the M1 ladder). SHARD_COUNT=N re-runs one task of an
+# N-way array on its own (sbatch --array=3 sets SLURM_ARRAY_TASK_COUNT=1).
 # Parallel cache fill (default config; each array task owns every N-th session; no scoring):
 #   MAN="m1.jsonl m2.jsonl" SPLIT=search LIMIT=0 NAME=prefill_search SCORE=0 sbatch --array=0-7 harness/twin/pilot.sbatch
 #SBATCH --job-name=vm-twin-pilot
@@ -20,7 +21,7 @@ MAN=${MAN:-data/datasets/manifests/libricss__sdm.jsonl}; SPLIT=${SPLIT:-search};
 NAME=${NAME:-pilot}; OUT=data/outputs/harness/runs/$NAME; CACHE=data/outputs/harness/cache; SCORE=${SCORE:-1}
 SHARD=(); FILLSEL=()
 if [ -n "${SLURM_ARRAY_TASK_ID:-}" ]; then
-  OUT=$OUT/shard$SLURM_ARRAY_TASK_ID; SHARD=(--shard "$SLURM_ARRAY_TASK_ID/$SLURM_ARRAY_TASK_COUNT")
+  OUT=$OUT/shard$SLURM_ARRAY_TASK_ID; SHARD=(--shard "$SLURM_ARRAY_TASK_ID/${SHARD_COUNT:-$SLURM_ARRAY_TASK_COUNT}")
   FILLSEL=(--sessions-file $OUT/_sessions.txt)
 fi
 echo "host=$(hostname) commit=$(git rev-parse --short HEAD) man=$MAN split=$SPLIT limit=$LIMIT start=$(date -Is)"
