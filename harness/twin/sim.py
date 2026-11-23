@@ -248,10 +248,16 @@ class Twin:
             visible = [d for d in decisions if d[0] <= tr["end"] + 4.0]
             for ln in aligner.lines(tr["start"], tr["end"], tr["tokens"], visible, ENGINE["alignerWindow"]):
                 lines.append({**ln, "speaker": None if ln["speaker"] is None else str(ln["speaker"]),
-                              "utterance": u, "engine": tr["engine"]})
+                              "utterance": u, "engine": tr["engine"], "language": tr["language"]})
                 lang_words[tr["language"]] += len(ln["text"].split()) or 1
+        # Final transcript of each utterance as the app hands it to CaptionTranslator (text + routed language).
+        final_texts = [{"utterance": u, "start": tr["start"], "end": tr["end"], "language": tr["language"],
+                        "engine": tr["engine"],
+                        "text": b"".join(raw for _, _, raw in tr["tokens"]).decode("utf-8", "ignore").strip()}
+                       for u, tr in sorted(finals.items())]
         return {"duration": duration, "language": lang_words.most_common(1)[0][0] if lang_words else None,
                 "lines": lines, "captions": captions, "utterances": utterances, "translations": [],
+                "finals": final_texts,
                 "cost": {"decode_audio_seconds": self.decoded_seconds, "decode_calls": len(self.traces),
                          "cost_model_calibrated": self.cost.calibrated},
                 "routes": self.traces}
