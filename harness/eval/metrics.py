@@ -67,32 +67,27 @@ def _char_seglst(seglst):
     return SegLST([{**s, "words": " ".join(chars(s["words"]))} for s in seglst])
 
 
-def _one_stream(seglst):
-    """Speaker-agnostic view for ORC-WER: all hypothesis words in one stream. ORC-WER over K diarized
-    streams is exponential in K (9 streams on a NOTSOFAR session needed ~79e9 GB, job 19520224), and the
-    metric ignores speakers anyway; with one stream it equals the pilot's undiarized ORC-WER."""
-    from meeteval.io import SegLST
-
-    return SegLST([{**s, "speaker": "all"} for s in seglst])
-
-
 def _one(result, session):
     er = result[session]
     return er.errors, er.length, er.insertions, er.deletions
 
 
 def asr_counts(session, ref_segments, lang, hyp_lines):
-    from meeteval.wer import cpwer, orcwer, tcpwer
+    from meeteval.wer import cpwer, greedy_orcwer, tcpwer
+
+    # ORC-WER (speaker-agnostic): greedy assignment. Exact ORC is exponential in the number of hypothesis
+    # streams (9 diarized streams on a NOTSOFAR session needed ~79e9 GB, job 19520224); greedy ORC is the
+    # MeetEval variant for many streams and gives an upper bound that is tight in practice.
 
     ref = _seglst(session, ref_segments, lang, "text")
     hyp = _seglst(session, hyp_lines, lang, "text")
-    o_err, o_len, o_ins, o_del = _one(orcwer(reference=ref, hypothesis=_one_stream(hyp)), session)
+    o_err, o_len, o_ins, o_del = _one(greedy_orcwer(reference=ref, hypothesis=hyp), session)
     c_err, c_len, _, _ = _one(cpwer(reference=ref, hypothesis=hyp), session)
     t_err, t_len, _, _ = _one(tcpwer(reference=ref, hypothesis=hyp, collar=COLLAR), session)
     out = {"orc_err": o_err, "orc_len": o_len, "orc_ins": o_ins, "orc_del": o_del,
            "cp_err": c_err, "cp_len": c_len, "tcp_err": t_err, "tcp_len": t_len, "dcp_err": c_err - o_err}
     if lang == "ar":
-        cc_err, cc_len, _, _ = _one(orcwer(reference=_char_seglst(ref), hypothesis=_one_stream(_char_seglst(hyp))), session)
+        cc_err, cc_len, _, _ = _one(greedy_orcwer(reference=_char_seglst(ref), hypothesis=_char_seglst(hyp)), session)
         out.update(orcc_err=cc_err, orcc_len=cc_len)
     return out
 
